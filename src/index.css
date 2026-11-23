@@ -51,7 +51,9 @@
   --cm-caret: 0 0 0;
   --cm-selection: 173 214 255;
   --cm-selection-match: 201 228 251;
-  --cm-active-line: 245 245 245;
+  /* Overlay (not a solid fill): the active line sits above the selection layer. */
+  --cm-active-line: 0 0 0;
+  --cm-active-line-alpha: 0.035;
   --cm-gutter-bg: 255 255 255;
   --cm-gutter-fg: 110 118 129;
   --cm-gutter-border: 240 240 240;
@@ -128,7 +130,8 @@
   --cm-caret: 174 175 173;
   --cm-selection: 38 79 120;
   --cm-selection-match: 58 61 65;
-  --cm-active-line: 35 35 35;
+  --cm-active-line: 255 255 255;
+  --cm-active-line-alpha: 0.04;
   --cm-gutter-bg: 30 30 30;
   --cm-gutter-fg: 133 133 133;
   --cm-gutter-border: 43 43 43;
@@ -205,7 +208,8 @@
   --cm-caret: 255 255 255;
   --cm-selection: 15 74 133;
   --cm-selection-match: 38 38 38;
-  --cm-active-line: 20 20 20;
+  --cm-active-line: 255 255 255;
+  --cm-active-line-alpha: 0.12;
   --cm-gutter-bg: 0 0 0;
   --cm-gutter-fg: 200 200 200;
   --cm-gutter-border: 60 60 60;
@@ -282,7 +286,8 @@
   --cm-caret: 7 54 66;
   --cm-selection: 223 215 190;
   --cm-selection-match: 233 225 200;
-  --cm-active-line: 245 238 218;
+  --cm-active-line: 0 0 0;
+  --cm-active-line-alpha: 0.045;
   --cm-gutter-bg: 253 246 227;
   --cm-gutter-fg: 147 161 161;
   --cm-gutter-border: 238 232 213;

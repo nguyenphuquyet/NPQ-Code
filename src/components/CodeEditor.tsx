@@ -75,7 +75,15 @@ const codeTheme = EditorView.theme(
       backgroundColor: "rgb(var(--cm-selection))",
     },
     ".cm-selectionMatch": { backgroundColor: "rgb(var(--cm-selection-match))" },
-    ".cm-activeLine": { backgroundColor: "rgb(var(--cm-active-line))" },
+    /*
+     * The active line paints in the line-background layer, which sits above
+     * CodeMirror's selection layer (z-index: -2). A solid fill would hide the
+     * selection on the line that holds the caret, so this must stay a
+     * translucent overlay — CodeMirror's own default uses rgba for this reason.
+     */
+    ".cm-activeLine": {
+      backgroundColor: "rgb(var(--cm-active-line) / var(--cm-active-line-alpha))",
+    },
     ".cm-gutters": {
       backgroundColor: "rgb(var(--cm-gutter-bg))",
       color: "rgb(var(--cm-gutter-fg))",
