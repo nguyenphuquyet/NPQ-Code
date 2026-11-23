@@ -1,114 +1,265 @@
-import { useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
-  Play, Bug, Hammer, ChevronDown, Search, Settings,
-  FolderOpen, FilePlus2, Save, SaveAll, Undo2, Redo2, FileCode2, Smartphone,
+  Code2,
+  Copy,
+  Eraser,
+  FolderOpen,
+  Maximize2,
+  Minus,
+  MinusSquare,
+  Redo2,
+  Save,
+  SaveAll,
+  Search,
+  Scissors,
+  Square,
+  TerminalSquare,
+  Undo2,
+  X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { useStudio } from "../lib/store";
-import TitleBar from "./TitleBar";
-import { useI18n, type I18nKey } from "../lib/i18n";
+import { isInteractive, warmWindow, winAction } from "../lib/window";
+import {
+  editorCopy,
+  editorCut,
+  editorFind,
+  editorPaste,
+  editorRedo,
+  editorSelectAll,
+  editorUndo,
+} from "../lib/editorActions";
 
-type MenuItem = { key?: I18nKey; icon?: any; action?: string; sep?: boolean };
+type MenuItem =
+  | { separator: true }
+  | {
+      label: string;
+      icon?: ReactNode;
+      shortcut?: string;
+      action: string;
+      disabled?: boolean;
+    };
 
-const MENUS: { id: string; key: I18nKey; items: MenuItem[] }[] = [
-  {
-    id: "file", key: "menu.file", items: [
-      { key: "menu.file.new", icon: FilePlus2, action: "new" },
-      { key: "menu.file.open", icon: FolderOpen, action: "open" },
-      { sep: true },
-      { key: "common.save", icon: Save, action: "save" },
-      { key: "common.saveAll", icon: SaveAll, action: "saveAll" },
-      { sep: true },
-      { key: "menu.file.closeProject", icon: FileCode2, action: "closeProject" },
-    ],
-  },
-  {
-    id: "edit", key: "menu.edit", items: [
-      { key: "common.undo", icon: Undo2, action: "undo" },
-      { key: "common.redo", icon: Redo2, action: "redo" },
-    ],
-  },
-  {
-    id: "view", key: "menu.view", items: [
-      { key: "menu.view.toolWindows", action: "" },
-      { key: "menu.view.appearance", action: "" },
-    ],
-  },
-  { id: "navigate", key: "menu.navigate", items: [{ key: "menu.navigate.searchEverywhere", action: "" }] },
-  { id: "code", key: "menu.code", items: [{ key: "menu.code.overrideMethods", action: "" }] },
-  { id: "analyze", key: "menu.analyze", items: [{ key: "menu.analyze.inspectCode", action: "" }] },
-  { id: "refactor", key: "menu.refactor", items: [{ key: "menu.refactor.rename", action: "" }] },
-  {
-    id: "build", key: "menu.build", items: [
-      { key: "menu.build.zip", icon: Hammer, action: "build" },
-      { key: "menu.build.rebuild", action: "build" },
-    ],
-  },
-  {
-    id: "run", key: "menu.run", items: [
-      { key: "menu.run.app", icon: Play, action: "run" },
-      { key: "menu.run.preview", icon: Smartphone, action: "preview" },
-    ],
-  },
-  { id: "tools", key: "menu.tools", items: [{ key: "menu.tools.sdkManager", action: "" }] },
-  { id: "vcs", key: "menu.vcs", items: [{ key: "menu.vcs.createRepo", action: "" }] },
-  { id: "window", key: "menu.window", items: [{ key: "menu.window.restoreLayout", action: "" }] },
-  { id: "help", key: "menu.help", items: [{ key: "menu.help.about", action: "about" }] },
-];
+const MENU_NAMES = ["File", "Edit", "Selection", "View", "Go", "Terminal", "Help"] as const;
 
 export default function TopBar() {
   const s = useStudio();
-  const { t } = useI18n();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const menusRef = useRef<HTMLDivElement>(null);
 
-  const runAction = (action?: string) => {
+  useEffect(() => {
+    warmWindow();
+  }, []);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenMenu(null);
+    };
+    const dismiss = (event: MouseEvent) => {
+      if (menusRef.current?.contains(event.target as Node)) return;
+      setOpenMenu(null);
+    };
+    const onBlur = () => setOpenMenu(null);
+    window.addEventListener("keydown", close);
+    window.addEventListener("mousedown", dismiss, true);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", close);
+      window.removeEventListener("mousedown", dismiss, true);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [openMenu]);
+
+  const activeFile = s.openFiles.find((file) => file.path === s.activePath);
+  const hasDirty = s.openFiles.some((file) => file.dirty);
+
+  const perform = (action: string) => {
     setOpenMenu(null);
-    if (!action) return;
     switch (action) {
-      case "new": s.setDialog("new"); break;
-      case "open": s.setDialog("open"); break;
-      case "save": if (s.activePath) s.saveFile(s.activePath); break;
-      case "saveAll": s.saveAll(); break;
-      case "closeProject": s.closeProject(); break;
-      case "build": s.runBuild(); break;
-      case "run": void (async () => { await s.runBuild(); })(); break;
-      case "preview": s.runPreview(); break;
-      case "about": s.showToast(t("about.text")); break;
+      case "openFolder": s.setDialog("open"); break;
+      case "save": if (s.activePath) void s.saveFile(s.activePath); break;
+      case "saveAll": void s.saveAll(); break;
+      case "closeEditor": if (s.activePath) s.closeTab(s.activePath); break;
+      case "closeFolder": s.closeWorkspace(); break;
+      case "exit": void winAction("close"); break;
+      case "undo": editorUndo(); break;
+      case "redo": editorRedo(); break;
+      case "cut": void editorCut(); break;
+      case "copy": void editorCopy(); break;
+      case "paste": void editorPaste(); break;
+      case "selectAll": editorSelectAll(); break;
+      case "find": editorFind(); break;
+      case "explorer": s.setSidebarView("explorer"); break;
+      case "search": s.openSearch(); break;
+      case "output": s.setBottomTab("output"); break;
+      case "problems": s.setBottomTab("problems"); break;
+      case "terminal": s.setBottomTab("terminal"); break;
+      case "toggleSidebar": s.toggleSidebar(); break;
+      case "toggleTerminal": s.toggleTerminal(); break;
+      case "clearTerminal": s.clearTerminal(); break;
+      case "stopCommand": void s.stopCommand(); break;
+      case "quickOpen": if (s.workspace) s.setQuickOpen(true); break;
+      case "zoomIn": s.zoomIn(); break;
+      case "zoomOut": s.zoomOut(); break;
+      case "zoomReset": s.resetZoom(); break;
+      case "about": s.showToast("NPQ Code 1.0 — a lightweight Tauri code editor"); break;
+      case "shortcuts":
+        s.showToast("Ctrl+P quick open · Ctrl+Shift+F search · Ctrl+` terminal");
+        break;
     }
   };
 
-  const activeFile = s.openFiles.find((f) => f.path === s.activePath);
+  const menus: Record<(typeof MENU_NAMES)[number], MenuItem[]> = {
+    File: [
+      { label: "Open Folder…", icon: <FolderOpen size={13} />, shortcut: "Ctrl+O", action: "openFolder" },
+      { separator: true },
+      {
+        label: "Save",
+        icon: <Save size={13} />,
+        shortcut: "Ctrl+S",
+        action: "save",
+        disabled: !activeFile?.dirty,
+      },
+      {
+        label: "Save All",
+        icon: <SaveAll size={13} />,
+        shortcut: "Ctrl+Shift+S",
+        action: "saveAll",
+        disabled: !hasDirty,
+      },
+      { separator: true },
+      {
+        label: "Close Editor",
+        icon: <X size={13} />,
+        shortcut: "Ctrl+W",
+        action: "closeEditor",
+        disabled: !activeFile,
+      },
+      {
+        label: "Close Folder",
+        icon: <FolderOpen size={13} />,
+        action: "closeFolder",
+        disabled: !s.workspace,
+      },
+      { separator: true },
+      { label: "Exit", icon: <MinusSquare size={13} />, action: "exit" },
+    ],
+    Edit: [
+      { label: "Undo", icon: <Undo2 size={13} />, shortcut: "Ctrl+Z", action: "undo", disabled: !activeFile },
+      { label: "Redo", icon: <Redo2 size={13} />, shortcut: "Ctrl+Y", action: "redo", disabled: !activeFile },
+      { separator: true },
+      { label: "Cut", icon: <Scissors size={13} />, shortcut: "Ctrl+X", action: "cut", disabled: !activeFile },
+      { label: "Copy", icon: <Copy size={13} />, shortcut: "Ctrl+C", action: "copy", disabled: !activeFile },
+      { label: "Paste", icon: <Copy size={13} />, shortcut: "Ctrl+V", action: "paste", disabled: !activeFile },
+      { separator: true },
+      { label: "Find", shortcut: "Ctrl+F", action: "find", disabled: !activeFile },
+    ],
+    Selection: [
+      { label: "Select All", shortcut: "Ctrl+A", action: "selectAll", disabled: !activeFile },
+    ],
+    View: [
+      { label: "Explorer", shortcut: "Ctrl+Shift+E", action: "explorer" },
+      { label: "Search", shortcut: "Ctrl+Shift+F", action: "search" },
+      { label: "Problems", shortcut: "Ctrl+Shift+M", action: "problems" },
+      { label: "Output", shortcut: "Ctrl+Shift+U", action: "output" },
+      { label: "Terminal", shortcut: "Ctrl+`", action: "terminal" },
+      { separator: true },
+      { label: "Toggle Side Bar", shortcut: "Ctrl+B", action: "toggleSidebar" },
+      { label: "Toggle Terminal", shortcut: "Ctrl+`", action: "toggleTerminal" },
+      { separator: true },
+      { label: "Zoom In", icon: <ZoomIn size={13} />, shortcut: "Ctrl+=", action: "zoomIn" },
+      { label: "Zoom Out", icon: <ZoomOut size={13} />, shortcut: "Ctrl+-", action: "zoomOut" },
+      { label: "Reset Zoom", shortcut: "Ctrl+0", action: "zoomReset" },
+    ],
+    Go: [
+      {
+        label: "Go to File…",
+        icon: <Search size={13} />,
+        shortcut: "Ctrl+P",
+        action: "quickOpen",
+        disabled: !s.workspace,
+      },
+    ],
+    Terminal: [
+      {
+        label: s.bottomVisible && s.bottomTab === "terminal" ? "Hide Terminal" : "Show Terminal",
+        icon: <TerminalSquare size={13} />,
+        shortcut: "Ctrl+`",
+        action: "toggleTerminal",
+        disabled: !s.workspace,
+      },
+      {
+        label: "Clear Terminal",
+        icon: <Eraser size={13} />,
+        action: "clearTerminal",
+      },
+      {
+        label: "Stop Running Command",
+        icon: <Square size={11} />,
+        action: "stopCommand",
+        disabled: s.terminalRunning === null,
+      },
+    ],
+    Help: [
+      { label: "Keyboard Shortcuts", action: "shortcuts" },
+      { separator: true },
+      { label: "About NPQ Code", icon: <Code2 size={13} />, action: "about" },
+    ],
+  };
+
+  const onMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || isInteractive(event.target)) return;
+    event.preventDefault();
+    void winAction("startDragging");
+  };
+
+  const onDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (isInteractive(event.target)) return;
+    void winAction("toggleMaximize");
+  };
 
   return (
-    <div className="flex flex-col bg-darcula-bg border-b border-black/40 select-none">
-      {/* Custom window frame: always mounted, also on the welcome screen. */}
-      <TitleBar
-        title={activeFile ? `${activeFile.name} — ${s.project?.name ?? ""}` : t("app.title")}
-      />
+    <div
+      className="drag-region relative z-40 flex h-9 shrink-0 select-none items-stretch border-b border-vs-border bg-vs-panel text-2xs"
+      onMouseDown={onMouseDown}
+      onDoubleClick={onDoubleClick}
+    >
+      <div className="no-drag flex items-center gap-2 px-3">
+        <Code2 size={16} className="text-vs-accent" />
+        <span className="text-xs font-semibold text-vs-strong">NPQ Code</span>
+      </div>
 
-      {/* Menu bar */}
-      <div className="no-drag flex items-center h-7 px-2 text-2xs relative z-30">
-        {MENUS.map(({ id: m, key: mKey, items }) => (
-          <div key={m} className="relative" onMouseEnter={() => openMenu && setOpenMenu(m)}>
+      <div ref={menusRef} className="no-drag flex items-stretch">
+        {MENU_NAMES.map((name) => (
+          <div key={name} className="relative flex items-stretch">
             <button
-              className={`px-2.5 py-1 rounded ${openMenu === m ? "bg-darcula-hover text-white" : "hover:bg-white/5"}`}
-              onClick={() => setOpenMenu(openMenu === m ? null : m)}
+              className={`px-2.5 text-vs-text hover:bg-vs-hover ${
+                openMenu === name ? "bg-vs-hover text-vs-strong" : ""
+              }`}
+              onMouseEnter={() => openMenu && setOpenMenu(name)}
+              onClick={() => setOpenMenu(openMenu === name ? null : name)}
             >
-              {t(mKey)}
+              {name}
             </button>
-            {openMenu === m && (
-              <div className="absolute top-full left-0 mt-0.5 min-w-[220px] bg-darcula-panel border border-black/50 rounded-sm shadow-2xl py-1 text-darcula-text">
-                {items.map((item, i) =>
-                  item.sep ? (
-                    <div key={i} className="h-px bg-white/10 my-1" />
+            {openMenu === name && (
+              <div className="absolute left-0 top-full z-50 min-w-[240px] rounded-b border border-vs-border bg-vs-editor py-1 text-vs-text shadow-lg">
+                {menus[name].map((item, index) =>
+                  "separator" in item ? (
+                    <div key={index} className="my-1 h-px bg-vs-border" />
                   ) : (
                     <button
-                      key={i}
-                      onClick={() => runAction(item.action)}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-darcula-hover hover:text-white text-left disabled:opacity-40"
-                      disabled={!item.action}
+                      key={index}
+                      disabled={item.disabled}
+                      onClick={() => perform(item.action)}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-vs-select disabled:cursor-default disabled:opacity-40"
                     >
-                      {item.icon && <item.icon size={13} className="text-darcula-dim" />}
-                      <span className="flex-1">{item.key ? t(item.key) : ""}</span>
+                      <span className="grid w-4 place-items-center text-vs-dim">{item.icon}</span>
+                      <span className="flex-1 truncate">{item.label}</span>
+                      {item.shortcut && (
+                        <span className="ml-6 shrink-0 text-vs-dim">{item.shortcut}</span>
+                      )}
                     </button>
                   ),
                 )}
@@ -116,55 +267,44 @@ export default function TopBar() {
             )}
           </div>
         ))}
-        <div className="flex-1" />
-        <div className="flex items-center gap-1 text-darcula-dim">
-          <Settings size={13} className="hover:text-white cursor-pointer" />
-        </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="no-drag flex items-center h-9 px-3 gap-1 border-t border-black/30 text-darcula-text">
-        <button className="p-1.5 rounded hover:bg-white/5 text-darcula-dim" title="Back"><ChevronDown size={15} className="-rotate-90" /></button>
-        <button className="p-1.5 rounded hover:bg-white/5 text-darcula-dim" title="Forward"><ChevronDown size={15} className="rotate-90" /></button>
-        <div className="w-px h-5 bg-white/10 mx-1" />
+      <div className="flex min-w-0 flex-1 items-center justify-center px-3">
         <button
-          onClick={() => void s.runBuild()}
-          disabled={!s.project || s.buildRunning}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-darcula-green/90 hover:bg-darcula-green text-white text-xs font-medium disabled:opacity-40"
-          title={t("toolbar.run")}
+          onClick={() => (s.workspace ? s.setQuickOpen(true) : s.setDialog("open"))}
+          className="no-drag flex h-6 w-full max-w-[520px] items-center gap-2 rounded border border-vs-border bg-vs-editor px-2.5 text-vs-dim hover:border-vs-accent/60 hover:text-vs-text"
+          title={s.workspace ? "Search files (Ctrl+P)" : "Open Folder (Ctrl+O)"}
         >
-          <Play size={13} fill="currentColor" />
-          <span>Run</span>
-          <ChevronDown size={12} />
-        </button>
-        <button className="p-1.5 rounded hover:bg-white/5 text-darcula-green" title={t("toolbar.debug")}><Bug size={15} /></button>
-        <button
-          onClick={() => s.runBuild()}
-          disabled={!s.project || s.buildRunning}
-          className="p-1.5 rounded hover:bg-white/5 disabled:opacity-40"
-          title={t("toolbar.buildZip")}
-        >
-          <Hammer size={15} />
-        </button>
-        <div className="w-px h-5 bg-white/10 mx-1" />
-        <button className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 text-2xs border border-white/10">
-          <Smartphone size={13} className="text-darcula-accent" />
-          <span>{t("toolbar.preview")}</span>
-          <span className="text-darcula-dim">390 × 844</span>
-          <ChevronDown size={12} className="text-darcula-dim" />
-        </button>
-        <button className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 text-2xs border border-white/10">
-          <span className="text-darcula-accent">SDK</span>
-          <span>{t("toolbar.sdk")}</span>
-          <ChevronDown size={12} className="text-darcula-dim" />
-        </button>
-        <div className="flex-1" />
-        <div className="flex items-center gap-2 px-2.5 py-1 rounded bg-darcula-editor border border-white/5 text-darcula-dim text-2xs w-64">
           <Search size={12} />
-          <span className="flex-1">{t("toolbar.searchEverywhere")}</span>
-          <kbd className="px-1 rounded bg-white/10 text-[0.625rem]">⇧⇧</kbd>
-        </div>
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 grid place-items-center text-white text-xs font-bold ml-1">Q</div>
+          <span className="min-w-0 flex-1 truncate text-center">
+            {activeFile ? activeFile.name : s.workspace ? s.workspace.name : "Open a folder to start"}
+          </span>
+          <kbd className="rounded bg-vs-sidebar px-1 text-[0.625rem] text-vs-dim">Ctrl+P</kbd>
+        </button>
+      </div>
+
+      <div className="no-drag flex items-center gap-0.5 pr-1">
+        <button
+          onClick={() => winAction("minimize")}
+          title="Minimize"
+          className="grid h-7 w-10 place-items-center rounded-sm text-vs-text hover:bg-vs-hover"
+        >
+          <Minus size={13} />
+        </button>
+        <button
+          onClick={() => winAction("toggleMaximize")}
+          title="Maximize / Restore"
+          className="grid h-7 w-10 place-items-center rounded-sm text-vs-text hover:bg-vs-hover"
+        >
+          <Maximize2 size={12} />
+        </button>
+        <button
+          onClick={() => winAction("close")}
+          title="Close"
+          className="grid h-7 w-10 place-items-center rounded-sm text-vs-text hover:bg-[#E81123] hover:text-white"
+        >
+          <X size={14} />
+        </button>
       </div>
     </div>
   );

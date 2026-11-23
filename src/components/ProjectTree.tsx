@@ -1,73 +1,111 @@
-import { useState } from "react";
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
-  Folder, FolderOpen, ChevronRight, FileCode2, FileText,
-  Braces, Palette, Globe, ScrollText, FilePlus2, FolderPlus, Trash2, RefreshCw,
-  ClipboardCopy, FileCode,
+  Braces,
+  ChevronRight,
+  ClipboardCopy,
+  FileCode2,
+  FilePlus2,
+  FileText,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  Globe,
+  Image as ImageIcon,
+  Palette,
+  Pencil,
+  RefreshCw,
+  ScrollText,
+  Trash2,
 } from "lucide-react";
 import { useStudio } from "../lib/store";
-import { api, type FileNode } from "../lib/api";
+import type { FileNode } from "../lib/api";
 import { useContextMenu } from "./ContextMenu";
 import { copyText } from "../lib/clipboard";
-import { useI18n } from "../lib/i18n";
-import type { MouseEvent as ReactMouseEvent } from "react";
 
 function fileIcon(name: string) {
-  if (name.endsWith(".tsx") || name.endsWith(".ts") || name.endsWith(".js") || name.endsWith(".mjs"))
-    return <FileCode2 size={14} className="text-darcula-blue" />;
-  if (name.endsWith(".json")) return <Braces size={14} className="text-darcula-yellow" />;
-  if (name.endsWith(".css")) return <Palette size={14} className="text-darcula-orange" />;
-  if (name.endsWith(".html")) return <Globe size={14} className="text-darcula-orange" />;
-  if (name.endsWith(".md")) return <ScrollText size={14} className="text-darcula-dim" />;
-  if (name === ".gitignore") return <FileText size={14} className="text-darcula-dim" />;
-  return <FileText size={14} className="text-darcula-dim" />;
+  const lower = name.toLowerCase();
+  if (/\.(tsx?|jsx?|mjs|cjs|mts|cts)$/.test(lower)) {
+    return <FileCode2 size={14} className="text-vs-blue" />;
+  }
+  if (/\.jsonc?$/.test(lower)) return <Braces size={14} className="text-vs-yellow" />;
+  if (/\.(css|scss|sass|less)$/.test(lower)) return <Palette size={14} className="text-vs-orange" />;
+  if (/\.(html?|xml|svg)$/.test(lower)) return <Globe size={14} className="text-vs-orange" />;
+  if (/\.(md|markdown|txt)$/.test(lower)) return <ScrollText size={14} className="text-vs-dim" />;
+  if (/\.(png|jpe?g|gif|webp|ico|bmp)$/.test(lower)) {
+    return <ImageIcon size={14} className="text-vs-purple" />;
+  }
+  return <FileText size={14} className="text-vs-dim" />;
 }
 
-function TreeNode({ node, depth }: { node: FileNode; depth: number }) {
+function parentDir(path: string) {
+  return path.replace(/[\\/][^\\/]+$/, "");
+}
+
+type TreeProps = {
+  node: FileNode;
+  depth: number;
+  expanded: Set<string>;
+  toggle: (path: string) => void;
+};
+
+function TreeNode({ node, depth, expanded, toggle }: TreeProps) {
   const s = useStudio();
   const ctx = useContextMenu();
-  const { t } = useI18n();
-  const [open, setOpen] = useState(depth < 2);
   const isActive = s.activePath === node.path;
-  const isOpenFile = s.openFiles.some((f) => f.path === node.path);
+  const open = expanded.has(node.path);
+  const openFile = s.openFiles.find((file) => file.path === node.path);
 
-  /** Project-tree menu — replaces the WebView's own right-click menu. */
-  const onContextMenu = (e: ReactMouseEvent) => {
+  const onContextMenu = (event: ReactMouseEvent) => {
     const items = node.is_dir
       ? [
           {
-            label: t("common.newFile"),
+            label: "New File",
             icon: <FilePlus2 size={12} />,
             action: () => {
-              const n = prompt(t("tree.fileNamePrompt"));
-              if (n) void s.newFile(node.path, n);
+              const name = window.prompt("New file name:");
+              if (name) void s.newFile(node.path, name);
             },
           },
           {
-            label: t("common.newDirectory"),
+            label: "New Folder",
             icon: <FolderPlus size={12} />,
             action: () => {
-              const n = prompt(t("tree.dirNamePrompt"));
-              if (n) void api.createDirectory(node.path + "/" + n).then(() => s.refreshTree());
+              const name = window.prompt("New folder name:");
+              if (name) void s.newFolder(node.path, name);
             },
           },
           { separator: true as const },
         ]
       : [
-          { label: t("common.open"), icon: <FileCode size={12} />, action: () => void s.openFile(node.path) },
+          { label: "Open", icon: <FileCode2 size={12} />, action: () => void s.openFile(node.path) },
           { separator: true as const },
         ];
 
-    ctx.open(e, [
+    ctx.open(event, [
       ...items,
-      { label: t("common.copyPath"), icon: <ClipboardCopy size={12} />, action: () => void copyText(node.path) },
-      { label: t("common.reload"), icon: <RefreshCw size={12} />, action: () => s.refreshTree() },
+      {
+        label: "Rename",
+        icon: <Pencil size={12} />,
+        action: () => {
+          const name = window.prompt("New name:", node.name);
+          if (name && name !== node.name) {
+            void s.renamePath(node.path, parentDir(node.path) + "/" + name);
+          }
+        },
+      },
+      { label: "Copy Path", icon: <ClipboardCopy size={12} />, action: () => void copyText(node.path) },
+      {
+        label: "Refresh",
+        icon: <RefreshCw size={12} />,
+        action: () => s.refreshTree(),
+      },
       { separator: true },
       {
-        label: t("common.delete"),
+        label: "Delete",
         icon: <Trash2 size={12} />,
         danger: true,
         action: () => {
-          if (confirm(t("tree.deleteConfirm", { path: node.path }))) void s.deleteFile(node.path);
+          if (window.confirm(`Delete ${node.name}?`)) void s.deleteFile(node.path);
         },
       },
     ]);
@@ -76,62 +114,150 @@ function TreeNode({ node, depth }: { node: FileNode; depth: number }) {
   if (node.is_dir) {
     return (
       <div>
-        <div
-          className={`flex items-center gap-1 px-1 py-[3px] cursor-pointer hover:bg-white/5 ${isActive ? "bg-darcula-selectInactive" : ""}`}
-          style={{ paddingLeft: 4 + depth * 12 }}
-          onClick={() => setOpen(!open)}
+        <button
+          className="flex w-full items-center gap-1 py-[3px] pr-2 text-left hover:bg-vs-hover"
+          style={{ paddingLeft: 8 + depth * 12 }}
+          onClick={() => toggle(node.path)}
           onContextMenu={onContextMenu}
         >
-          <ChevronRight size={12} className={`text-darcula-dim transition-transform ${open ? "rotate-90" : ""}`} />
-          {open ? <FolderOpen size={14} className="text-darcula-accent" /> : <Folder size={14} className="text-darcula-accent" />}
-          <span className="text-2xs text-darcula-text truncate">{node.name}</span>
-        </div>
-        {open && node.children.map((c) => <TreeNode key={c.path} node={c} depth={depth + 1} />)}
+          <ChevronRight
+            size={12}
+            className={`shrink-0 text-vs-dim transition-transform ${open ? "rotate-90" : ""}`}
+          />
+          {open ? (
+            <FolderOpen size={14} className="shrink-0 text-vs-accent" />
+          ) : (
+            <Folder size={14} className="shrink-0 text-vs-accent" />
+          )}
+          <span className="truncate text-2xs text-vs-text">{node.name}</span>
+        </button>
+        {open &&
+          node.children.map((child) => (
+            <TreeNode
+              key={child.path}
+              node={child}
+              depth={depth + 1}
+              expanded={expanded}
+              toggle={toggle}
+            />
+          ))}
       </div>
     );
   }
 
   return (
-    <div
-      className={`flex items-center gap-1 px-1 py-[3px] cursor-pointer hover:bg-white/5 ${isActive ? "bg-darcula-select text-white" : ""}`}
+    <button
+      className={`flex w-full items-center gap-1 py-[3px] pr-2 text-left hover:bg-vs-hover ${
+        isActive ? "bg-vs-select" : ""
+      }`}
       style={{ paddingLeft: 20 + depth * 12 }}
-      onClick={() => s.openFile(node.path)}
+      onClick={() => void s.openFile(node.path)}
       onContextMenu={onContextMenu}
     >
-      <span className="w-3" />
+      <span className="w-3 shrink-0" />
       {fileIcon(node.name)}
-      <span className={`text-2xs truncate ${isOpenFile && !isActive ? "text-white" : "text-darcula-text"}`}>{node.name}</span>
-      {s.openFiles.find((f) => f.path === node.path)?.dirty && (
-        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-darcula-modified" />
-      )}
-    </div>
+      <span
+        className={`truncate text-2xs ${
+          isActive || openFile ? "text-vs-strong" : "text-vs-text"
+        }`}
+      >
+        {node.name}
+      </span>
+      {openFile?.dirty && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-vs-modified" />}
+    </button>
   );
 }
 
 export default function ProjectTree() {
   const s = useStudio();
-  const { t } = useI18n();
-  if (!s.tree) return <div className="p-3 text-2xs text-darcula-dim">{t("tree.noProject")}</div>;
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // A new folder starts collapsed, like a fresh Explorer.
+  useEffect(() => {
+    setExpanded(new Set());
+  }, [s.workspace?.path]);
+
+  const toggle = (path: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  };
+
+  const createAtRoot = async (kind: "file" | "folder") => {
+    if (!s.workspace) return;
+    const name = window.prompt(kind === "file" ? "New file name:" : "New folder name:");
+    if (!name) return;
+    if (kind === "file") await s.newFile(s.workspace.path, name);
+    else await s.newFolder(s.workspace.path, name);
+  };
+
+  if (!s.workspace) {
+    return (
+      <div className="flex h-full flex-col bg-vs-sidebar">
+        <div className="flex h-7 shrink-0 items-center px-3 text-2xs font-semibold uppercase tracking-wide text-vs-dim">
+          Explorer
+        </div>
+        <div className="px-4 py-6 text-2xs text-vs-dim">
+          <p>You have not opened a folder yet.</p>
+          <button
+            onClick={() => s.setDialog("open")}
+            className="mt-3 rounded bg-vs-accent px-3 py-1.5 text-white hover:opacity-90"
+          >
+            Open Folder
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full flex flex-col bg-darcula-editor">
-      <div className="flex items-center h-7 px-2 border-b border-black/40 text-2xs text-darcula-text shrink-0">
-        <span className="font-semibold">{t("tree.title")}</span>
-        <span className="mx-1.5 text-darcula-dim">|</span>
-        <span className="text-darcula-dim">{t("tree.subtitle")}</span>
-        <div className="flex-1" />
-        <button className="p-1 hover:bg-white/10 rounded" title={t("tree.collapseAll")} onClick={() => location.reload()}>
-          <ChevronRight size={12} className="text-darcula-dim" />
+    <div className="flex h-full flex-col bg-vs-sidebar">
+      <div className="flex h-7 shrink-0 items-center gap-1 px-2 text-2xs font-semibold uppercase tracking-wide text-vs-dim">
+        <span className="flex-1">Explorer</span>
+        <button
+          className="grid h-5 w-5 place-items-center rounded hover:bg-vs-hover"
+          title="New File"
+          onClick={() => void createAtRoot("file")}
+        >
+          <FilePlus2 size={13} />
         </button>
-        <button className="p-1 hover:bg-white/10 rounded" title={t("tree.refresh")} onClick={() => s.refreshTree()}>
-          <RefreshCw size={12} className="text-darcula-dim" />
+        <button
+          className="grid h-5 w-5 place-items-center rounded hover:bg-vs-hover"
+          title="New Folder"
+          onClick={() => void createAtRoot("folder")}
+        >
+          <FolderPlus size={13} />
+        </button>
+        <button
+          className="grid h-5 w-5 place-items-center rounded hover:bg-vs-hover"
+          title="Refresh"
+          onClick={() => s.refreshTree()}
+        >
+          <RefreshCw size={12} />
+        </button>
+        <button
+          className="grid h-5 w-5 place-items-center rounded hover:bg-vs-hover"
+          title="Collapse All"
+          onClick={() => setExpanded(new Set())}
+        >
+          <ChevronRight size={12} />
         </button>
       </div>
-      <div className="flex-1 overflow-auto py-1">
-        <div className="flex items-center gap-1 px-1 py-1 text-2xs font-semibold text-darcula-accent">
-          <FolderOpen size={14} />
-          <span className="truncate">{s.project?.name ?? s.tree.name}</span>
-        </div>
-        {s.tree.children.map((c) => <TreeNode key={c.path} node={c} depth={0} />)}
+
+      <div className="flex items-center gap-1 px-2 py-1 text-2xs font-bold uppercase tracking-wide text-vs-strong">
+        <span className="truncate">{s.workspace.name}</span>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-auto pb-2">
+        {s.tree?.children.map((child) => (
+          <TreeNode key={child.path} node={child} depth={0} expanded={expanded} toggle={toggle} />
+        ))}
+        {s.tree && s.tree.children.length === 0 && (
+          <div className="px-3 py-2 text-2xs text-vs-dim">This folder is empty.</div>
+        )}
       </div>
     </div>
   );

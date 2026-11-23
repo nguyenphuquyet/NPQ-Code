@@ -1,12 +1,12 @@
 [package]
-name = "qchat-miniapp-studio"
+name = "npq-code"
 version = "1.0.0"
-description = "Android-Studio-style IDE for QChat Mini Apps"
+description = "A lightweight, VS Code-style desktop code editor"
 authors = ["nguyenphuquyet"]
 edition = "2021"
 
 [lib]
-name = "qchat_miniapp_studio_lib"
+name = "npq_code_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

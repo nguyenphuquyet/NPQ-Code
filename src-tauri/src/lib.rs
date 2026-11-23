@@ -1,18 +1,19 @@
 mod commands;
-mod templates;
 
-use commands::build::PreviewState;
+use commands::terminal::TerminalState;
+use std::collections::HashMap;
+use std::sync::Mutex;
+#[cfg(debug_assertions)]
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(PreviewState(std::sync::Mutex::new(None)))
+        .manage(TerminalState(Mutex::new(HashMap::new())))
         .invoke_handler(tauri::generate_handler![
-            commands::project::create_project,
-            commands::project::open_project,
-            commands::project::recent_projects,
+            commands::project::open_workspace,
+            commands::project::recent_workspaces,
             commands::project::remove_recent,
             commands::fs::list_tree,
             commands::fs::read_file,
@@ -21,16 +22,12 @@ pub fn run() {
             commands::fs::create_directory,
             commands::fs::delete_path,
             commands::fs::rename_path,
-            commands::build::build_project,
-            commands::build::start_preview,
-            commands::build::stop_preview,
-            commands::build::release_zip_path,
-            commands::build::check_node,
-            commands::build::install_node,
-            commands::build::reveal_in_folder,
+            commands::search::search_workspace,
+            commands::terminal::run_command,
+            commands::terminal::stop_command,
+            commands::terminal::stop_all_commands,
         ])
         .setup(|app| {
-            // Open devtools only in debug builds for convenience.
             #[cfg(debug_assertions)]
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.open_devtools();

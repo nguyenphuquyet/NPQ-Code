@@ -2,23 +2,21 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::Deserialize;
 use tauri::{AppHandle, Manager};
 
-use super::{ProjectInfo, RecentProject};
-use crate::templates::render_template;
+use super::{RecentWorkspace, WorkspaceInfo};
 
 fn recent_file(app: &AppHandle) -> Option<PathBuf> {
     app.path().app_config_dir().ok().map(|p| p.join("recent.json"))
 }
 
-fn read_recent(app: &AppHandle) -> Vec<RecentProject> {
+fn read_recent(app: &AppHandle) -> Vec<RecentWorkspace> {
     let Some(path) = recent_file(app) else { return vec![] };
     let Ok(bytes) = fs::read(&path) else { return vec![] };
     serde_json::from_slice(&bytes).unwrap_or_default()
 }
 
-fn write_recent(app: &AppHandle, list: &[RecentProject]) {
+fn write_recent(app: &AppHandle, list: &[RecentWorkspace]) {
     let Some(path) = recent_file(app) else { return };
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
@@ -31,107 +29,50 @@ fn write_recent(app: &AppHandle, list: &[RecentProject]) {
 fn add_recent(app: &AppHandle, path: &str, name: &str) {
     let mut list = read_recent(app);
     list.retain(|p| p.path != path);
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
-    list.insert(0, RecentProject { path: path.into(), name: name.into(), opened_at: now });
-    list.truncate(12);
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    list.insert(
+        0,
+        RecentWorkspace {
+            path: path.into(),
+            name: name.into(),
+            opened_at: now,
+        },
+    );
+    list.truncate(15);
     write_recent(app, &list);
 }
 
-/// Turns a project name into a folder name. Only the characters Windows
-/// forbids (and control characters) are replaced, so `Game 1` stays `Game 1`
-/// instead of losing its spaces.
-fn sanitize_name(name: &str) -> String {
-    let mut out = String::with_capacity(name.len());
-    for c in name.chars() {
-        let forbidden = matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
-            || (c as u32) < 0x20;
-        out.push(if forbidden { '-' } else { c });
-    }
-    // Windows forbids trailing dots and spaces, and the names are used in paths.
-    let cleaned = out.trim().trim_end_matches('.').trim();
-    cleaned.chars().take(64).collect()
-}
-
-#[derive(Deserialize)]
-pub struct CreateProjectArgs {
-    pub parent_dir: String,
-    pub name: String,
-    pub app_id: String,
-    pub description: String,
-    pub version: String,
-    pub permissions: Vec<String>,
-}
-
+/// Opens a folder as the workspace. Any directory is valid — no project
+/// metadata is required.
 #[tauri::command]
-pub fn create_project(app: AppHandle, args: CreateProjectArgs) -> Result<String, String> {
-    let folder = sanitize_name(&args.name);
-    if folder.is_empty() {
-        return Err("Invalid project name".into());
+pub fn open_workspace(app: AppHandle, path: String) -> Result<WorkspaceInfo, String> {
+    let dir = Path::new(&path);
+    if !dir.is_dir() {
+        return Err(format!("Not a folder: {path}"));
     }
-    let parent = Path::new(args.parent_dir.trim());
-    // The project always sits one level under the chosen directory: if that
-    // directory is already named after the project, use it as is instead of
-    // creating `<picked>\<project>\<project>`.
-    let parent_name = parent
+    let canonical = fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+    let path_str = canonical.to_string_lossy().to_string();
+    let name = canonical
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
-        .unwrap_or_default();
-    let project_dir = if parent_name.eq_ignore_ascii_case(&folder) {
-        parent.to_path_buf()
-    } else {
-        parent.join(&folder)
-    };
-    if project_dir.exists() {
-        // An empty folder is fine to fill in; anything else is a real conflict.
-        let empty = fs::read_dir(&project_dir)
-            .map(|mut entries| entries.next().is_none())
-            .unwrap_or(false);
-        if !empty {
-            return Err(format!("Directory already exists: {}", project_dir.display()));
-        }
-    }
-    let files = render_template(&args.name, &args.app_id, &args.description, &args.version, &args.permissions);
-    for file in &files {
-        let target = project_dir.join(&file.path);
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        fs::write(&target, &file.content).map_err(|e| e.to_string())?;
-    }
-    let path_str = project_dir.to_string_lossy().to_string();
-    add_recent(&app, &path_str, &args.name);
-    Ok(path_str)
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| path_str.clone());
+    add_recent(&app, &path_str, &name);
+    Ok(WorkspaceInfo {
+        path: path_str,
+        name,
+    })
 }
 
 #[tauri::command]
-pub fn open_project(app: AppHandle, path: String) -> Result<ProjectInfo, String> {
-    let manifest_path = Path::new(&path).join("qchat.manifest.json");
-    if !manifest_path.exists() {
-        return Err("Not a QChat Mini App project: qchat.manifest.json not found".into());
-    }
-    let bytes = fs::read(&manifest_path).map_err(|e| e.to_string())?;
-    let manifest: serde_json::Value = serde_json::from_slice(&bytes).map_err(|e| format!("Invalid manifest: {e}"))?;
-    let name = manifest.get("name").and_then(|v| v.as_str()).unwrap_or("Unnamed").to_string();
-    let info = ProjectInfo {
-        path: path.clone(),
-        name: name.clone(),
-        app_id: manifest.get("appId").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        version: manifest.get("version").and_then(|v| v.as_str()).unwrap_or("0.0.0").to_string(),
-        description: manifest.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        entry: manifest.get("entry").and_then(|v| v.as_str()).unwrap_or("index.html").to_string(),
-        permissions: manifest
-            .get("requestedPermissions")
-            .and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-            .unwrap_or_default(),
-    };
-    add_recent(&app, &path, &name);
-    Ok(info)
-}
-
-#[tauri::command]
-pub fn recent_projects(app: AppHandle) -> Vec<RecentProject> {
+pub fn recent_workspaces(app: AppHandle) -> Vec<RecentWorkspace> {
     read_recent(&app)
+        .into_iter()
+        .filter(|r| Path::new(&r.path).is_dir())
+        .collect()
 }
 
 #[tauri::command]

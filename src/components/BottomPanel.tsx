@@ -1,153 +1,261 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Hammer, Play, TerminalSquare, ChevronUp, CheckCircle2,
-  XCircle, Loader2, Package, ClipboardCopy, Eraser, FolderOpen,
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  ClipboardCopy,
+  Eraser,
+  Loader2,
+  ScrollText,
+  Square,
+  TerminalSquare,
 } from "lucide-react";
 import { useStudio } from "../lib/store";
 import type { BottomTab } from "../lib/store";
 import { useContextMenu } from "./ContextMenu";
 import { copyText } from "../lib/clipboard";
-import { revealInFolder } from "../lib/shell";
-import { useI18n, type I18nKey } from "../lib/i18n";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 
-const TABS: { id: BottomTab; labelKey: I18nKey; icon: any }[] = [
-  { id: "build", labelKey: "bottom.tab.build", icon: Hammer },
-  { id: "run", labelKey: "bottom.tab.run", icon: Play },
-  { id: "terminal", labelKey: "bottom.tab.terminal", icon: TerminalSquare },
+const TABS: { id: BottomTab; label: string; icon: typeof TerminalSquare }[] = [
+  { id: "problems", label: "Problems", icon: AlertCircle },
+  { id: "output", label: "Output", icon: ScrollText },
+  { id: "terminal", label: "Terminal", icon: TerminalSquare },
 ];
 
 export default function BottomPanel({ onHide }: { onHide: () => void }) {
   const s = useStudio();
   const ctx = useContextMenu();
-  const { t } = useI18n();
-  const logRef = useRef<HTMLDivElement>(null);
-
-  /** Opens the folder with the built ZIP (falls back to the project's release/ folder). */
-  const openBuildFolder = () => {
-    const target = s.buildResult?.zip_path ?? (s.project ? s.project.path + "/release" : null);
-    if (target) revealInFolder(target).catch((e) => s.showToast(String(e)));
-  };
+  const terminalLogRef = useRef<HTMLDivElement>(null);
+  const outputLogRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [command, setCommand] = useState("");
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
   useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [s.buildLogs, s.bottomTab]);
+    if (terminalLogRef.current) {
+      terminalLogRef.current.scrollTop = terminalLogRef.current.scrollHeight;
+    }
+  }, [s.terminal, s.bottomTab, s.bottomVisible]);
 
-  /** Right-click in the build/terminal panes: copy or clear the log. */
-  const onLogContextMenu = (e: ReactMouseEvent) => {
-    ctx.open(e, [
+  useEffect(() => {
+    if (outputLogRef.current) {
+      outputLogRef.current.scrollTop = outputLogRef.current.scrollHeight;
+    }
+  }, [s.output]);
+
+  useEffect(() => {
+    if (s.bottomTab === "terminal" && s.bottomVisible) inputRef.current?.focus();
+  }, [s.bottomTab, s.bottomVisible]);
+
+  const copyLog = () => void copyText(s.terminal.map((line) => line.line).join("\n"));
+
+  const onLogContextMenu = (event: ReactMouseEvent) => {
+    ctx.open(event, [
       {
-        label: t("common.copyLog"),
+        label: "Copy Log",
         icon: <ClipboardCopy size={12} />,
-        disabled: s.buildLogs.length === 0,
-        action: () => void copyText(s.buildLogs.map((l) => l.line).join("\n")),
+        disabled: s.terminal.length === 0,
+        action: copyLog,
       },
       {
-        label: t("common.clearLog"),
+        label: "Clear",
         icon: <Eraser size={12} />,
-        disabled: s.buildLogs.length === 0 && !s.buildResult,
-        action: s.clearBuildLogs,
+        disabled: s.terminal.length === 0,
+        action: s.clearTerminal,
       },
       { separator: true },
       {
-        label: t("common.runBuild"),
-        icon: <Hammer size={12} />,
-        disabled: !s.project || s.buildRunning,
-        action: () => void s.runBuild(),
+        label: "Stop Running Command",
+        icon: <Square size={11} />,
+        disabled: s.terminalRunning === null,
+        action: () => void s.stopCommand(),
       },
     ]);
   };
 
+  const submit = () => {
+    const value = command.trim();
+    if (!value) return;
+    setHistory((prev) => [...prev.slice(-99), value]);
+    setHistoryIndex(-1);
+    setCommand("");
+    void s.runCommand(value);
+  };
+
+  const onInputKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submit();
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (history.length === 0) return;
+      const next = historyIndex < 0 ? history.length - 1 : Math.max(0, historyIndex - 1);
+      setHistoryIndex(next);
+      setCommand(history[next]);
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (historyIndex < 0) return;
+      const next = historyIndex + 1;
+      if (next >= history.length) {
+        setHistoryIndex(-1);
+        setCommand("");
+      } else {
+        setHistoryIndex(next);
+        setCommand(history[next]);
+      }
+    } else if (event.key === "l" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      s.clearTerminal();
+    }
+  };
+
+  const clearCurrent = () => {
+    if (s.bottomTab === "terminal") s.clearTerminal();
+    else if (s.bottomTab === "output") s.clearOutput();
+  };
+
   return (
-    <div className="h-full flex flex-col bg-darcula-panel border-t border-black/40">
-      <div className="flex items-center h-7 px-1 border-b border-black/30 shrink-0">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => s.setBottomTab(tab.id)}
-            className={`flex items-center gap-1.5 px-3 h-7 text-2xs border-b-2 ${
-              s.bottomTab === tab.id
-                ? "text-white border-darcula-modified"
-                : "text-darcula-dim border-transparent hover:text-darcula-text"
-            }`}
-          >
-            <tab.icon size={12} />
-            {t(tab.labelKey)}
-            {tab.id === "build" && s.buildRunning && <Loader2 size={11} className="animate-spin text-darcula-accent" />}
-            {tab.id === "build" && !s.buildRunning && s.buildResult?.success && <CheckCircle2 size={11} className="text-darcula-green" />}
-            {tab.id === "build" && !s.buildRunning && s.buildResult && !s.buildResult.success && <XCircle size={11} className="text-darcula-red" />}
-          </button>
-        ))}
-        <div className="flex-1" />
-        {s.buildResult?.zip_path && (
-          <span className="flex items-center gap-1 text-2xs text-darcula-green mr-2">
-            <Package size={12} />
-            <span className="max-w-[240px] truncate">{t("bottom.package", { path: s.buildResult.zip_path.split(/[\\/]/).pop() ?? "" })}</span>
-            <button className="p-0.5 hover:bg-white/10 rounded" title={t("bottom.openFolder")} onClick={openBuildFolder}>
-              <FolderOpen size={12} />
+    <div className="flex h-full flex-col border-t border-vs-border bg-vs-panel">
+      <div className="flex h-8 shrink-0 items-center border-b border-vs-border px-1">
+        {TABS.map((tab) => {
+          const active = s.bottomTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => s.setBottomTab(tab.id)}
+              className={`flex h-8 items-center gap-1.5 border-b-2 px-3 text-2xs ${
+                active
+                  ? "border-vs-accent text-vs-strong"
+                  : "border-transparent text-vs-dim hover:text-vs-text"
+              }`}
+            >
+              <tab.icon size={12} />
+              {tab.label}
+              {tab.id === "terminal" && s.terminalRunning !== null && (
+                <Loader2 size={11} className="animate-spin text-vs-accent" />
+              )}
             </button>
-          </span>
+          );
+        })}
+        <div className="flex-1" />
+        {s.bottomTab === "terminal" && s.terminalRunning !== null && (
+          <button
+            className="mr-1 flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs text-vs-red hover:bg-vs-hover"
+            onClick={() => void s.stopCommand()}
+            title="Stop running command"
+          >
+            <Square size={10} /> Stop
+          </button>
         )}
-        <button className="p-1 hover:bg-white/10 rounded" onClick={onHide} title={t("common.hide")}>
-          <ChevronUp size={13} className="text-darcula-dim" />
+        <button
+          className="grid h-6 w-6 place-items-center rounded text-vs-dim hover:bg-vs-hover hover:text-vs-text"
+          onClick={clearCurrent}
+          title="Clear"
+        >
+          <Eraser size={13} />
+        </button>
+        <button
+          className="grid h-6 w-6 place-items-center rounded text-vs-dim hover:bg-vs-hover hover:text-vs-text"
+          onClick={onHide}
+          title="Hide Panel"
+        >
+          <ChevronDown size={14} />
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {s.bottomTab === "build" && (
-          <div ref={logRef} className="h-full overflow-auto p-2 font-mono text-2xs leading-relaxed" onContextMenu={onLogContextMenu}>
-            {s.buildLogs.length === 0 && !s.buildRunning && (
-              <div className="text-darcula-dim">{t("bottom.buildHint")}</div>
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <div className={s.bottomTab === "problems" ? "h-full" : "hidden"}>
+          <div className="flex flex-col items-center justify-center gap-2 py-10 text-2xs text-vs-dim">
+            <CheckCircle2 size={22} className="text-vs-green" />
+            <span>No problems have been detected in the workspace.</span>
+          </div>
+        </div>
+
+        <div className={s.bottomTab === "output" ? "h-full" : "hidden"}>
+          <div
+            ref={outputLogRef}
+            className="h-full overflow-auto px-3 py-2 font-mono text-2xs leading-relaxed"
+          >
+            {s.output.length === 0 && (
+              <div className="text-vs-dim">No output yet. Editor events appear here.</div>
             )}
-            {s.buildLogs.map((l, i) => (
+            {s.output.map((line, index) => (
               <div
-                key={i}
+                key={index}
                 className={
-                  l.stream === "stderr" ? "text-red-400" :
-                  l.stream === "error" ? "text-red-400 font-semibold" :
-                  l.stream === "info" ? "text-darcula-accent font-semibold" :
-                  "text-darcula-text"
+                  line.stream === "error"
+                    ? "text-vs-red"
+                    : line.stream === "info"
+                      ? "text-vs-text"
+                      : "text-vs-dim"
                 }
               >
-                <span className="text-darcula-dim/50 mr-2 select-none">{String(i + 1).padStart(3, " ")}</span>
-                {l.line || "\u00A0"}
+                {line.line || "\u00A0"}
               </div>
             ))}
-            {s.buildRunning && (
-              <div className="flex items-center gap-2 text-darcula-accent mt-1">
-                <Loader2 size={12} className="animate-spin" /> {t("bottom.building")}
-              </div>
-            )}
-            {s.buildResult && (
-              <div className={`mt-2 flex items-center gap-2 font-semibold ${s.buildResult.success ? "text-darcula-green" : "text-darcula-red"}`}>
-                {s.buildResult.success ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                {t(s.buildResult.success ? "bottom.buildSucceeded" : "bottom.buildFailed")}
-                {s.buildResult.success && (
-                  <button
-                    className="ml-2 flex items-center gap-1 px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white font-normal"
-                    onClick={openBuildFolder}
-                  >
-                    <FolderOpen size={12} /> {t("bottom.openFolder")}
-                  </button>
-                )}
-              </div>
-            )}
           </div>
-        )}
+        </div>
 
-        {s.bottomTab === "run" && (
-          <div className="p-3 text-2xs text-darcula-dim font-mono">
-            <div className="text-darcula-green">$ npm run dev</div>
-            <div className="mt-1">{t("bottom.runHint")}</div>
-          </div>
-        )}
+        <div className={s.bottomTab === "terminal" ? "h-full" : "hidden"}>
+          <div
+            className="flex h-full flex-col"
+            onClick={(event) => {
+              if ((event.target as HTMLElement).tagName !== "INPUT") inputRef.current?.focus();
+            }}
+          >
+            <div
+              ref={terminalLogRef}
+              onContextMenu={onLogContextMenu}
+              className="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-2xs leading-relaxed"
+            >
+              {s.terminal.length === 0 && (
+                <div className="text-vs-dim">
+                  Integrated terminal. Commands run in the opened folder.
+                </div>
+              )}
+              {s.terminal.map((line, index) => (
+                <div
+                  key={index}
+                  className={
+                    line.stream === "stderr" || line.stream === "error"
+                      ? "text-vs-red"
+                      : line.stream === "info"
+                        ? "text-vs-accent"
+                        : line.stream === "system"
+                          ? "text-vs-dim"
+                          : "text-vs-text"
+                  }
+                >
+                  <span className="whitespace-pre-wrap break-all">{line.line || "\u00A0"}</span>
+                </div>
+              ))}
+            </div>
 
-        {s.bottomTab === "terminal" && (
-          <div className="p-3 text-2xs text-darcula-text font-mono" onContextMenu={onLogContextMenu}>
-            <div><span className="text-darcula-green">user@qchat-studio</span>:<span className="text-darcula-accent">~/project</span>$ _</div>
-            <div className="text-darcula-dim mt-2">{t("bottom.terminalHint")}</div>
+            <div className="flex shrink-0 items-center gap-2 border-t border-vs-border px-3 py-1.5">
+              <span className="shrink-0 font-mono text-2xs text-vs-green">
+                {s.workspace?.name ?? "shell"}
+                <span className="text-vs-dim"> $</span>
+              </span>
+              <input
+                ref={inputRef}
+                value={command}
+                onChange={(event) => setCommand(event.target.value)}
+                onKeyDown={onInputKeyDown}
+                placeholder="Type a command and press Enter"
+                spellCheck={false}
+                className="min-w-0 flex-1 bg-transparent font-mono text-2xs text-vs-text outline-none placeholder:text-vs-dim"
+              />
+              {s.terminalRunning !== null && (
+                <span className="flex shrink-0 items-center gap-1 text-2xs text-vs-dim">
+                  <Loader2 size={10} className="animate-spin" /> running
+                </span>
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

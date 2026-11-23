@@ -1,119 +1,111 @@
-import { useEffect } from "react";
-import {
-  FolderOpen, FilePlus2, Clock, Trash2, Settings, Puzzle, GraduationCap,
-  FolderGit2, ChevronRight,
-} from "lucide-react";
+import { Code2, FolderGit2, FolderOpen, Trash2 } from "lucide-react";
 import { useStudio } from "../lib/store";
-import { api } from "../lib/api";
-import { useI18n, type I18nKey } from "../lib/i18n";
 
-const NAV: { id: string; key: I18nKey; icon: any }[] = [
-  { id: "projects", key: "welcome.nav.projects", icon: FolderGit2 },
-  { id: "customize", key: "welcome.nav.customize", icon: Settings },
-  { id: "plugins", key: "welcome.nav.plugins", icon: Puzzle },
-  { id: "learn", key: "welcome.nav.learn", icon: GraduationCap },
+const SHORTCUTS = [
+  { keys: "Ctrl+P", label: "Go to file" },
+  { keys: "Ctrl+Shift+F", label: "Search in folder" },
+  { keys: "Ctrl+S", label: "Save file" },
+  { keys: "Ctrl+`", label: "Toggle terminal" },
+  { keys: "Ctrl+B", label: "Toggle side bar" },
+  { keys: "Ctrl+Shift+E", label: "Explorer" },
 ];
 
 export default function WelcomeScreen() {
   const s = useStudio();
-  const { t } = useI18n();
-
-  useEffect(() => {
-    if (s.dialog === "open") {
-      (async () => {
-        const dir = await api.pickDirectory();
-        if (dir) await s.doOpenProject(dir);
-        s.setDialog(null);
-      })();
-    }
-  }, [s.dialog]);
 
   return (
-    <div className="h-full flex bg-darcula-bg">
-      {/* Left nav */}
-      <div className="w-56 bg-[#333537] border-r border-black/40 py-6 flex flex-col">
-        <div className="px-5 mb-8">
-          <div className="text-white font-semibold text-sm">{t("app.title")}</div>
-          <div className="text-2xs text-darcula-dim mt-0.5">{t("welcome.version")}</div>
-        </div>
-        {NAV.map((n, i) => (
-          <button
-            key={n.id}
-            className={`flex items-center gap-3 px-5 py-2.5 text-xs ${i === 0 ? "bg-white/10 text-white border-l-2 border-darcula-accent" : "text-darcula-dim hover:bg-white/5 border-l-2 border-transparent"}`}
-          >
-            <n.icon size={15} />
-            {t(n.key)}
-          </button>
-        ))}
-        <div className="flex-1" />
-        <div className="px-5 text-2xs text-darcula-dim/70">
-          {t("welcome.footer")}
-        </div>
-      </div>
-
-      {/* Main */}
-      <div className="flex-1 flex flex-col p-8 overflow-auto">
-        <div className="flex items-center gap-2 mb-6">
-          <button
-            onClick={() => s.setDialog("new")}
-            className="flex items-center gap-2 px-4 py-2 rounded bg-darcula-green hover:bg-emerald-600 text-white text-xs font-medium"
-          >
-            <FilePlus2 size={14} /> {t("welcome.newProject")}
-          </button>
-          <button
-            onClick={() => s.setDialog("open")}
-            className="flex items-center gap-2 px-4 py-2 rounded bg-white/10 hover:bg-white/15 text-white text-xs"
-          >
-            <FolderOpen size={14} /> {t("welcome.open")}
-          </button>
-          <div className="flex-1" />
-          <div className="text-2xs text-darcula-dim flex items-center gap-1">
-            <Clock size={11} /> {t("welcome.recent")}
+    <div className="h-full overflow-auto bg-vs-editor">
+      <div className="mx-auto grid max-w-5xl gap-12 px-10 py-14 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <section>
+          <div className="mb-10 flex items-center gap-3">
+            <div className="grid h-14 w-14 place-items-center rounded-xl border border-vs-border bg-vs-sidebar">
+              <Code2 size={28} className="text-vs-accent" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-vs-strong">NPQ Code</h1>
+              <p className="text-2xs text-vs-dim">A lightweight code editor for your folders</p>
+            </div>
           </div>
-        </div>
 
-        <div className="bg-darcula-editor rounded-lg border border-black/30 overflow-hidden">
-          {s.recent.length === 0 ? (
-            <div className="p-10 text-center text-darcula-dim text-xs">
-              {t("welcome.noRecent")}
-            </div>
-          ) : (
-            s.recent.map((r) => (
-              <div
-                key={r.path}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 cursor-pointer border-b border-white/5 last:border-0 group"
-                onClick={() => s.doOpenProject(r.path)}
+          <h2 className="mb-3 text-xs font-semibold text-vs-strong">Start</h2>
+          <div className="space-y-1 text-2xs">
+            <button
+              onClick={() => s.setDialog("open")}
+              className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-vs-accent hover:bg-vs-hover"
+            >
+              <FolderOpen size={15} />
+              <span className="font-medium">Open Folder…</span>
+            </button>
+          </div>
+
+          <div className="mt-8 mb-2 flex items-center justify-between">
+            <h2 className="text-xs font-semibold text-vs-strong">Recent</h2>
+            {s.recent.length > 0 && (
+              <button
+                className="text-2xs text-vs-dim hover:text-vs-text"
+                onClick={() => {
+                  for (const item of s.recent) s.removeRecent(item.path);
+                }}
               >
-                <FolderGit2 size={16} className="text-darcula-accent shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-white truncate">{r.name}</div>
-                  <div className="text-2xs text-darcula-dim truncate">{r.path}</div>
-                </div>
-                <button
-                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded text-darcula-dim"
-                  onClick={(e) => { e.stopPropagation(); s.removeRecent(r.path); s.loadRecent(); }}
-                  title={t("welcome.removeRecent")}
-                >
-                  <Trash2 size={12} />
-                </button>
-                <ChevronRight size={14} className="text-darcula-dim" />
-              </div>
-            ))
-          )}
-        </div>
+                Clear all
+              </button>
+            )}
+          </div>
 
-        <div className="mt-6 grid grid-cols-3 gap-3">
-          {[
-            { title: t("welcome.card1.title"), desc: t("welcome.card1.desc") },
-            { title: t("welcome.card2.title"), desc: t("welcome.card2.desc") },
-            { title: t("welcome.card3.title"), desc: t("welcome.card3.desc") },
-          ].map((c) => (
-            <div key={c.title} className="p-4 rounded-lg bg-white/5 border border-white/5">
-              <div className="text-xs text-white font-medium mb-1">{c.title}</div>
-              <div className="text-2xs text-darcula-dim leading-relaxed">{c.desc}</div>
-            </div>
-          ))}
-        </div>
+          <div className="overflow-hidden rounded-md border border-vs-border">
+            {s.recent.length === 0 ? (
+              <div className="px-4 py-8 text-center text-2xs text-vs-dim">
+                Folders you open will show up here.
+              </div>
+            ) : (
+              s.recent.map((item) => (
+                <div
+                  key={item.path}
+                  className="group flex cursor-pointer items-center gap-3 border-b border-vs-border px-4 py-2.5 last:border-0 hover:bg-vs-hover"
+                  onClick={() => void s.openWorkspace(item.path)}
+                >
+                  <FolderGit2 size={15} className="shrink-0 text-vs-accent" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-2xs font-medium text-vs-strong">{item.name}</div>
+                    <div className="truncate text-[0.625rem] text-vs-dim">{item.path}</div>
+                  </div>
+                  <button
+                    className="grid h-6 w-6 place-items-center rounded text-vs-dim opacity-0 hover:bg-vs-badge group-hover:opacity-100"
+                    title="Remove from recent"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      s.removeRecent(item.path);
+                    }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="text-2xs">
+          <h2 className="mb-3 text-xs font-semibold text-vs-strong">Keyboard shortcuts</h2>
+          <div className="overflow-hidden rounded-md border border-vs-border">
+            {SHORTCUTS.map((shortcut) => (
+              <div
+                key={shortcut.keys}
+                className="flex items-center justify-between border-b border-vs-border px-4 py-2 last:border-0"
+              >
+                <span className="text-vs-text">{shortcut.label}</span>
+                <kbd className="rounded border border-vs-border bg-vs-sidebar px-1.5 py-0.5 text-[0.625rem] text-vs-dim">
+                  {shortcut.keys}
+                </kbd>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 rounded-md border border-vs-border p-4 leading-relaxed text-vs-dim">
+            Open any folder, edit its files with syntax highlighting, search across the
+            tree, and run commands in the integrated terminal. Nothing else is bolted on.
+          </div>
+        </section>
       </div>
     </div>
   );

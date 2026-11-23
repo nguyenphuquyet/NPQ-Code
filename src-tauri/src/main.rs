@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    qchat_miniapp_studio_lib::run()
+    npq_code_lib::run()
 }

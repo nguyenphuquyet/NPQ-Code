@@ -1,148 +1,164 @@
-import { X, ChevronRight, FileCode2 } from "lucide-react";
+import { ChevronRight, FileCode2, X } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useStudio } from "../lib/store";
-import { fileLanguage } from "../lib/api";
+import { fileLanguage, relativePath } from "../lib/api";
 import CodeEditor from "./CodeEditor";
 import { useContextMenu } from "./ContextMenu";
 import { copyText } from "../lib/clipboard";
-import { useI18n } from "../lib/i18n";
 import { getActiveEditor } from "../lib/editorBridge";
 import {
-  editorCopy, editorCut, editorFind, editorPaste, editorRedo, editorSelectAll, editorUndo,
+  editorCopy,
+  editorCut,
+  editorFind,
+  editorPaste,
+  editorRedo,
+  editorSelectAll,
+  editorUndo,
   hasEditorSelection,
 } from "../lib/editorActions";
 
 function tabIcon(name: string) {
-  return <FileCode2 size={13} className={name.endsWith(".json") ? "text-darcula-yellow" : "text-darcula-blue"} />;
+  if (name.endsWith(".json")) return <FileCode2 size={13} className="text-vs-yellow" />;
+  if (/\.(css|scss|less)$/.test(name)) return <FileCode2 size={13} className="text-vs-orange" />;
+  if (/\.(md|txt)$/.test(name)) return <FileCode2 size={13} className="text-vs-dim" />;
+  return <FileCode2 size={13} className="text-vs-blue" />;
 }
 
 export default function EditorArea() {
   const s = useStudio();
   const ctx = useContextMenu();
-  const { t } = useI18n();
-  const active = s.openFiles.find((f) => f.path === s.activePath);
+  const active = s.openFiles.find((file) => file.path === s.activePath);
 
-  const breadcrumb = active
-    ? active.path.replace(/\\/g, "/").split("/").slice(-3)
+  const crumbs = active
+    ? relativePath(s.workspace?.path ?? "", active.path).replace(/\\/g, "/").split("/")
     : [];
 
-  /** Right-click inside the code editor: real CodeMirror commands. */
-  const onEditorContextMenu = (e: ReactMouseEvent) => {
+  const onEditorContextMenu = (event: ReactMouseEvent) => {
     const view = getActiveEditor();
-    ctx.open(e, [
-      { label: t("common.undo"), shortcut: "Ctrl+Z", disabled: !view, action: editorUndo },
-      { label: t("common.redo"), shortcut: "Ctrl+Y", disabled: !view, action: editorRedo },
+    ctx.open(event, [
+      { label: "Undo", shortcut: "Ctrl+Z", disabled: !view, action: editorUndo },
+      { label: "Redo", shortcut: "Ctrl+Y", disabled: !view, action: editorRedo },
       { separator: true },
-      { label: t("common.cut"), shortcut: "Ctrl+X", disabled: !hasEditorSelection(), action: () => void editorCut() },
-      { label: t("common.copy"), shortcut: "Ctrl+C", disabled: !hasEditorSelection(), action: () => void editorCopy() },
-      { label: t("common.paste"), shortcut: "Ctrl+V", disabled: !view, action: () => void editorPaste() },
+      { label: "Cut", shortcut: "Ctrl+X", disabled: !hasEditorSelection(), action: () => void editorCut() },
+      { label: "Copy", shortcut: "Ctrl+C", disabled: !hasEditorSelection(), action: () => void editorCopy() },
+      { label: "Paste", shortcut: "Ctrl+V", disabled: !view, action: () => void editorPaste() },
       { separator: true },
-      { label: t("common.selectAll"), shortcut: "Ctrl+A", disabled: !view, action: editorSelectAll },
-      { label: t("common.find"), shortcut: "Ctrl+F", disabled: !view, action: editorFind },
+      { label: "Select All", shortcut: "Ctrl+A", disabled: !view, action: editorSelectAll },
+      { label: "Find…", shortcut: "Ctrl+F", disabled: !view, action: editorFind },
       { separator: true },
       {
-        label: t("common.save"),
+        label: "Save",
         shortcut: "Ctrl+S",
         disabled: !active?.dirty,
         action: () => active && void s.saveFile(active.path),
       },
+      { label: "Copy Path", action: () => active && void copyText(active.path) },
     ]);
   };
 
-  /** Right-click on a tab. */
-  const onTabContextMenu = (e: ReactMouseEvent, path: string, dirty: boolean) => {
-    ctx.open(e, [
-      { label: t("common.save"), shortcut: "Ctrl+S", disabled: !dirty, action: () => void s.saveFile(path) },
+  const onTabContextMenu = (event: ReactMouseEvent, path: string, dirty: boolean) => {
+    ctx.open(event, [
+      { label: "Save", shortcut: "Ctrl+S", disabled: !dirty, action: () => void s.saveFile(path) },
       { separator: true },
-      { label: t("common.close"), action: () => s.closeTab(path) },
+      { label: "Close", shortcut: "Ctrl+W", action: () => s.closeTab(path) },
       {
-        label: t("common.closeOthers"),
+        label: "Close Others",
         disabled: s.openFiles.length < 2,
-        action: () => s.openFiles.forEach((f) => f.path !== path && s.closeTab(f.path)),
+        action: () => s.closeOtherTabs(path),
       },
-      { label: t("common.closeAll"), action: () => s.openFiles.forEach((f) => s.closeTab(f.path)) },
+      { label: "Close All", action: () => s.closeAllTabs() },
       { separator: true },
-      { label: t("common.copyPath"), action: () => void copyText(path) },
+      { label: "Copy Path", action: () => void copyText(path) },
     ]);
   };
 
   return (
-    <div className="h-full flex flex-col bg-darcula-editor min-w-0">
+    <div className="flex h-full min-w-0 flex-col bg-vs-editor">
       {/* Tabs */}
-      <div className="flex items-end h-8 bg-darcula-panel border-b border-black/40 overflow-x-auto shrink-0">
-        {s.openFiles.map((f) => {
-          const isActive = f.path === s.activePath;
+      <div className="flex h-9 shrink-0 items-stretch overflow-x-auto border-b border-vs-border bg-vs-panel">
+        {s.openFiles.map((file) => {
+          const isActive = file.path === s.activePath;
           return (
             <div
-              key={f.path}
-              onClick={() => s.setActive(f.path)}
-              onAuxClick={(e) => { if (e.button === 1) s.closeTab(f.path); }}
-              onContextMenu={(e) => onTabContextMenu(e, f.path, f.dirty)}
-              className={`group flex items-center gap-1.5 h-8 px-3 text-2xs cursor-pointer border-r border-black/30 min-w-[120px] max-w-[200px] ${
+              key={file.path}
+              onClick={() => s.setActive(file.path)}
+              onAuxClick={(event) => {
+                if (event.button === 1) s.closeTab(file.path);
+              }}
+              onContextMenu={(event) => onTabContextMenu(event, file.path, file.dirty)}
+              className={`group flex min-w-[130px] max-w-[220px] cursor-pointer items-center gap-1.5 border-r border-t-2 border-vs-border px-3 text-2xs ${
                 isActive
-                  ? "bg-darcula-editor text-white border-t-2 border-t-darcula-modified -mb-px"
-                  : "bg-darcula-panel text-darcula-dim hover:bg-darcula-lighter/50"
+                  ? "border-t-vs-accent bg-vs-editor text-vs-strong"
+                  : "border-t-transparent bg-vs-panel text-vs-dim hover:bg-vs-hover"
               }`}
             >
-              {tabIcon(f.name)}
-              <span className="truncate flex-1">{f.name}</span>
-              {f.dirty ? (
+              {tabIcon(file.name)}
+              <span className="min-w-0 flex-1 truncate">{file.name}</span>
+              {file.dirty ? (
                 <span
-                  className="w-2.5 h-2.5 rounded-full bg-darcula-modified group-hover:hidden cursor-pointer"
-                  onClick={(e) => { e.stopPropagation(); s.saveFile(f.path); }}
-                  title={t("editor.unsaved")}
+                  className="h-2.5 w-2.5 shrink-0 cursor-pointer rounded-full bg-vs-modified group-hover:hidden"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void s.saveFile(file.path);
+                  }}
+                  title="Unsaved changes — click to save"
                 />
               ) : null}
               <button
-                className={`p-0.5 rounded hover:bg-white/15 ${f.dirty ? "hidden group-hover:block" : ""}`}
-                onClick={(e) => { e.stopPropagation(); s.closeTab(f.path); }}
+                className={`grid h-4 w-4 shrink-0 place-items-center rounded hover:bg-vs-badge ${
+                  file.dirty ? "hidden group-hover:grid" : isActive ? "" : "opacity-0 group-hover:opacity-100"
+                }`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  s.closeTab(file.path);
+                }}
+                title="Close"
               >
                 <X size={12} />
               </button>
             </div>
           );
         })}
-        {s.openFiles.length === 0 && (
-          <div className="px-3 h-8 flex items-center text-2xs text-darcula-dim">{t("editor.noTabs")}</div>
-        )}
       </div>
 
       {/* Breadcrumb */}
       {active && (
-        <div className="flex items-center h-6 px-3 text-2xs text-darcula-dim border-b border-black/20 bg-darcula-editor shrink-0 overflow-hidden">
-          {breadcrumb.map((p, i) => (
-            <span key={i} className="flex items-center gap-1 truncate">
-              {i > 0 && <ChevronRight size={10} className="text-darcula-dim/60" />}
-              <span className={i === breadcrumb.length - 1 ? "text-darcula-text" : ""}>{p}</span>
+        <div className="flex h-6 shrink-0 items-center overflow-hidden border-b border-vs-border bg-vs-editor px-3 text-2xs text-vs-dim">
+          {crumbs.map((part, index) => (
+            <span key={index} className="flex min-w-0 items-center gap-1">
+              {index > 0 && <ChevronRight size={10} className="shrink-0 text-vs-dim/70" />}
+              <span className={`truncate ${index === crumbs.length - 1 ? "text-vs-strong" : ""}`}>
+                {part}
+              </span>
             </span>
           ))}
-          <span className="flex items-center gap-1 ml-2 text-darcula-dim/70">
-            <ChevronRight size={10} />
-            <span>{active.language === "tsx" ? "App" : ""}</span>
-          </span>
         </div>
       )}
 
       {/* Editor */}
-      <div className="flex-1 min-h-0 relative" onContextMenu={onEditorContextMenu}>
+      <div className="relative min-h-0 flex-1" onContextMenu={onEditorContextMenu}>
         {active ? (
           <CodeEditor
             key={active.path}
             content={active.content}
             language={fileLanguage(active.path)}
-            onChange={(v) => s.updateContent(active.path, v)}
+            reveal={s.reveal && s.reveal.path === active.path ? s.reveal : null}
+            onChange={(value) => s.updateContent(active.path, value)}
             onCursor={(line, col) => s.setCursor(line, col)}
-            onSave={() => s.saveFile(active.path)}
+            onSave={() => void s.saveFile(active.path)}
           />
         ) : (
           <div className="absolute inset-0 grid place-items-center text-center">
-            <div className="text-darcula-dim">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-400/20 to-emerald-800/20 grid place-items-center">
-                <FileCode2 size={32} className="text-emerald-400/60" />
+            <div className="max-w-sm text-vs-dim">
+              <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-lg border border-vs-border bg-vs-sidebar">
+                <FileCode2 size={30} className="text-vs-accent" />
               </div>
-              <p className="text-sm text-darcula-text mb-1">{t("app.title")}</p>
-              <p className="text-2xs">{t("editor.emptyHint")}</p>
-              <p className="text-2xs mt-3 text-darcula-dim/70">{t("editor.tip")}</p>
+              <p className="mb-1 text-sm text-vs-strong">NPQ Code</p>
+              <p className="text-2xs">Open a file from the Explorer to start editing.</p>
+              <p className="mt-3 text-2xs">
+                Press <kbd className="rounded bg-vs-sidebar px-1">Ctrl+P</kbd> to search files or{" "}
+                <kbd className="rounded bg-vs-sidebar px-1">Ctrl+`</kbd> for the terminal.
+              </p>
             </div>
           </div>
         )}

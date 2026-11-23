@@ -1,8 +1,9 @@
 {
-  "name": "qchat-miniapp-studio",
+  "name": "npq-code",
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "description": "A lightweight, VS Code-style desktop code editor built with Tauri",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

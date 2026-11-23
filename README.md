@@ -1,19 +1,34 @@
-# QChat Mini App Studio
+# NPQ Code
 
-Một IDE kiểu Android Studio (giao diện Darcula) để code Mini App cho [QChat-3](https://github.com/nguyenphuquyet/QChat-3).
-Viết bằng **TypeScript** (React + Vite + TailwindCSS + Lucide icons + JetBrains Mono font), build bằng **Tauri v2** (Rust backend).
+Một IDE desktop nhẹ, giao diện sáng kiểu **Visual Studio Code**, để mở thư mục và viết code.
+Frontend: **TypeScript** (React + Vite + TailwindCSS + Lucide + CodeMirror 6).
+Backend: **Tauri v2** (Rust).
 
 ## Tính năng
 
-- **Màn hình Welcome** kiểu Android Studio: New Project / Open / Recent Projects.
-- **Tạo dự án**: scaffold sẵn template React + Vite, có sẵn `@qchat/miniapp-sdk` được vendored trong `src/sdk/` (không phụ thuộc monorepo), `qchat.manifest.json` đúng chuẩn QChat (schemaVersion, appId `mp_…`, version semver, requestedPermissions). Thư mục mặc định là `Documents\QChat Mini App Studio Project` (tự tạo nếu chưa có) và dự án luôn được tạo ở tầng thứ nhất trong thư mục đã chọn — `<thư mục>\<tên dự án>`, không thêm thư mục trung gian.
-- **Mở dự án**: import project mini app có sẵn (tự nhận diện `qchat.manifest.json`).
-- **Giao diện y hệt Android Studio**: title bar + menu bar (File/Edit/View/Navigate/Code/Analyze/Refactor/Build/Run/Tools/VCS/Window/Help) + toolbar (Run xanh, Debug, Build, device selector "QChat Mini App Preview", SDK selector, Search Everywhere) + Project tool window trái + editor tabs + breadcrumb + gutter line numbers + syntax highlighting Darcula (CodeMirror 6) + bottom tool window (Build/Run/Preview/Terminal) + status bar (git branch, UTF-8, LF, line:col…).
-- **Editor**: CodeMirror 6 với theme Darcula, highlight TS/TSX/JS/JSON/HTML/CSS, autocomplete, bracket matching, Ctrl+S save, tab dirty marker.
-- **Build một chạm**: `npm install` → `vite build` → `scripts/package.mjs` tạo ZIP trong `release/`, log stream realtime vào tab Build.
-- **Live Preview**: chạy mini app trong WebView mô phỏng (khung điện thoại 390×844), có inject sẵn **mock `QChatNative` bridge** nên `QChat.showToast`, `getAppInfo`, `getSystemInfo`, `getUserInfo`, `storage`, `chooseImage`, `share`, `request` hoạt động đúng như trên thiết bị.
-- **Manifest panel** bên phải: chỉnh tên/appId/version/permissions và ghi thẳng vào `qchat.manifest.json`.
-- **File tree**: new file / new directory / delete (context menu chuột phải), tự bỏ qua `node_modules`, `dist`, `release`, `.git`.
+- **Open Folder**: mở bất kỳ thư mục nào làm workspace (không cần manifest, không ràng buộc framework).
+- **Explorer**: cây tệp có tạo tệp/thư mục, đổi tên, xoá, copy đường dẫn, làm mới, thu gọn.
+- **Editor**: tab, breadcrumb, dirty marker, lưu bằng `Ctrl+S`, highlight TS/TSX/JS/JSX/JSON/HTML/CSS, autocomplete, bracket matching, tìm kiếm trong tệp.
+- **Tìm kiếm toàn workspace**: panel Search (`Ctrl+Shift+F`), kết quả theo tệp, bấm để nhảy đúng dòng/cột.
+- **Quick Open**: `Ctrl+P` để mở nhanh tệp theo tên.
+- **Terminal tích hợp**: chạy lệnh shell ngay trong workspace, log stream theo thời gian thực, dừng lệnh đang chạy.
+- **Giao diện sáng đồng bộ**: một bảng màu phẳng, không gradient; thanh trạng thái kiểu VS Code.
+- **Recent folders**: mở lại workspace gần đây từ màn hình Welcome.
+- **Zoom giao diện**: `Ctrl+=`, `Ctrl+-`, `Ctrl+0`.
+
+## Phím tắt
+
+| Phím | Chức năng |
+| --- | --- |
+| `Ctrl+P` | Quick Open (mở tệp theo tên) |
+| `Ctrl+Shift+F` | Tìm kiếm trong thư mục |
+| `Ctrl+Shift+E` | Mở Explorer |
+| `Ctrl+B` | Ẩn/hiện thanh bên |
+| `Ctrl+S` | Lưu tệp |
+| `Ctrl+Shift+S` | Lưu tất cả |
+| `Ctrl+W` | Đóng tab hiện tại |
+| `Ctrl+`` ` `` | Ẩn/hiện Terminal |
+| `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | Phóng to / thu nhỏ / reset giao diện |
 
 ## Chạy (dev)
 
@@ -22,43 +37,36 @@ npm install
 npm run tauri dev
 ```
 
+Chỉ cần frontend (không cần Rust):
+
+```bash
+npm install
+npm run dev
+```
+
+Khi chạy bằng trình duyệt, ứng dụng tự dùng workspace demo trong bộ nhớ (thư mục `/demo/npq-code`) để xem được Explorer, editor, search và terminal. Bản desktop luôn đọc thư mục thật trên đĩa.
+
 ## Build bản release
 
 ```bash
 npm run tauri build
 ```
 
-Output: `src-tauri/target/release/qchat-miniapp-studio` (Linux) / `.exe` / `.msi` (Windows) / `.dmg` (macOS), kèm installer (deb/AppImage/msi/dmg).
-
-> Chỉ cần frontend (không cần Rust): `npm run build` → thư mục `dist/`.
+Output nằm trong `src-tauri/target/release/bundle/` (`.msi`/`.exe` trên Windows, `.dmg` trên macOS, `.AppImage`/`.deb` trên Linux).
 
 ## Cấu trúc
 
 ```
-src/                     # TypeScript frontend (React)
-  components/            # TopBar, ProjectTree, EditorArea, BottomPanel, StatusBar, WelcomeScreen, NewProjectDialog, ManifestPanel, CodeEditor
-  lib/                   # api.ts (invoke wrappers), store.tsx (React context state)
+src/                     # Frontend React
+  components/            # TopBar, ActivityBar, Sidebar, ProjectTree, SearchPanel,
+                         # EditorArea, CodeEditor, BottomPanel, StatusBar,
+                         # WelcomeScreen, QuickOpen, ContextMenu
+  lib/                   # api.ts (invoke wrappers), store.tsx (state), window.ts, editor*
 src-tauri/
   src/
-    commands/            # project.rs (tạo/mở dự án), fs.rs (đọc/ghi file), build.rs (npm build + preview server)
-    templates.rs         # template nhúng + mock bridge JS
-    templates/           # file template mini app (React + Vite + SDK vendored)
+    commands/            # project.rs (workspace + recent), fs.rs (file tree/IO),
+                         # search.rs (search toàn workspace), terminal.rs (shell)
   icons/                 # icon ứng dụng
 ```
 
-## GitHub Actions (build đa nền tảng)
-
-Đã kèm sẵn 2 workflow trong `.github/workflows/`:
-
-- `ci.yml` — chạy trên mỗi push/PR: typecheck + build frontend + `cargo check` (Linux).
-- `release.yml` — khi push tag `v*` (ví dụ `git tag v1.0.0 && git push --tags`): build song song **Windows (.msi/.exe), macOS (.dmg), Linux (.AppImage/.deb)** bằng `tauri-apps/tauri-action` và tạo draft release kèm artifact.
-
-```bash
-git init && git add . && git commit -m "QChat Mini App Studio"
-git tag v1.0.0 && git push origin main --tags
-```
-
-## Lưu ý
-
-- File ZIP sau build nằm trong `<dự án>/release/<appId>-<version>.zip`, upload lên QChat Developer Center hoặc qua API `POST /api/miniapps/developer/apps/:appId/builds` với `X-QChat-Key`.
-- `appId` phải khớp với app đã tạo trong Developer Center (định dạng `mp_<12-24 ký tự hex>`).
+Terminal dùng shell sẵn có của máy (`cmd.exe` trên Windows, `sh` trên macOS/Linux), chạy trực tiếp trong thư mục đã mở.

@@ -9,23 +9,22 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: #3c3f41;
-  color: #bbbbbb;
-  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+  background: #f3f3f3;
+  color: #3b3b3b;
+  font-family: "Segoe UI", "Inter", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
 
 /*
- * `--ui-scale` is set at runtime by the studio store (localStorage key
- * `qchat.uiScale`, default 1.15) and multiplies the rem base, so every rem-based
- * Tailwind size — text, heights, paddings, gaps — scales with the UI zoom buttons
- * / Ctrl +, Ctrl -, Ctrl 0.
+ * `--ui-scale` is set at runtime by the editor store (localStorage key
+ * `npqcode.uiScale`, default 1.1) and multiplies the rem base, so every rem-based
+ * Tailwind size — text, heights, paddings, gaps — scales with the zoom commands.
  * Do not set `font-size` on `html` together with `body`: `html` must stay the rem
  * base for those rem-based sizes.
  */
 html {
-  font-size: calc(16px * var(--ui-scale, 1.15));
+  font-size: calc(16px * var(--ui-scale, 1.1));
 }
 
 body,
@@ -37,84 +36,44 @@ body,
   box-sizing: border-box;
 }
 
-/* Darcula scrollbars */
-::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-::-webkit-scrollbar-track {
-  background: #2b2b2b;
-}
-::-webkit-scrollbar-thumb {
-  background: #56595c;
-  border: 3px solid #2b2b2b;
-  border-radius: 8px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #6b6f73;
-}
-::-webkit-scrollbar-corner {
-  background: #2b2b2b;
+::selection {
+  background: #add6ff;
+  color: #1f1f1f;
 }
 
-/* CodeMirror Darcula */
+/* Light scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #f3f3f3;
+}
+::-webkit-scrollbar-thumb {
+  background: #c8c8c8;
+  border: 2px solid #f3f3f3;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+::-webkit-scrollbar-corner {
+  background: #f3f3f3;
+}
+
+/* CodeMirror shell; colours come from the light theme in CodeEditor.tsx. */
 .cm-editor {
   height: 100%;
-  background: #2b2b2b;
-  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
-  font-size: 0.8125rem; /* 13px at 100% zoom */
+  font-family: "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 0.8125rem;
   line-height: 1.6;
 }
 .cm-editor .cm-scroller {
-  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-family: inherit;
   overflow: auto;
 }
 .cm-editor .cm-gutters {
-  background: #313335;
-  color: #606366;
-  border-right: 1px solid #323232;
-  font-family: "JetBrains Mono", monospace;
-}
-.cm-editor .cm-activeLineGutter {
-  background: #323232;
-  color: #a4a3a3;
-}
-.cm-editor .cm-activeLine {
-  background: #323232;
-}
-.cm-editor .cm-selectionBackground,
-.cm-editor.cm-focused .cm-selectionBackground {
-  background: #214283 !important;
-}
-.cm-editor .cm-cursor {
-  border-left-color: #ffffff;
-}
-.cm-editor .cm-matchingBracket {
-  background: #3a5a3a;
-  outline: 1px solid #59a869;
-}
-.cm-editor .cm-tooltip {
-  background: #3c3f41;
-  border: 1px solid #4b4f52;
-  color: #bbbbbb;
-}
-.cm-editor .cm-completionIcon {
-  opacity: 0.7;
-}
-.cm-editor .cm-panel.cm-search {
-  background: #3c3f41;
-  color: #bbbbbb;
-  border-top: 1px solid #323232;
-}
-.cm-editor .cm-panel input {
-  background: #2b2b2b;
-  border: 1px solid #4b4f52;
-  color: #bbbbbb;
-  border-radius: 3px;
-  padding: 2px 6px;
-}
-.cm-editor .cm-foldGutter span {
-  color: #808080;
+  font-family: inherit;
 }
 
 input,
@@ -128,10 +87,10 @@ button {
 }
 
 /*
- * Window dragging is implemented in JS (`onTitleBarMouseDown` in
- * components/TopBar.tsx): the window is created with `decorations: false`, and
- * Tauri (WebView2 / WebKitGTK) ignores Electron's `-webkit-app-region` API.
- * `.drag-region` and `.no-drag` therefore stay as plain selectors used by that
- * handler — `.no-drag` marks interactive areas (window buttons, menu bar) that
- * must keep normal click behaviour.
+ * Window dragging is implemented in JS (`onMouseDown` in components/TopBar.tsx):
+ * the window is created with `decorations: false`, and Tauri (WebView2 /
+ * WebKitGTK) ignores Electron's `-webkit-app-region` API. `.drag-region` and
+ * `.no-drag` therefore stay as plain selectors used by that handler — `.no-drag`
+ * marks interactive areas (window buttons, menu bar) that must keep normal click
+ * behaviour.
  */

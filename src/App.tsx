@@ -1,49 +1,45 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  FolderTree, Braces, GitBranch, Hammer, Smartphone, ChevronDown,
-} from "lucide-react";
 import { useStudio } from "./lib/store";
 import { api } from "./lib/api";
-import { useI18n } from "./lib/i18n";
 import TopBar from "./components/TopBar";
-import TitleBar from "./components/TitleBar";
-import ProjectTree from "./components/ProjectTree";
+import ActivityBar from "./components/ActivityBar";
+import Sidebar from "./components/Sidebar";
 import EditorArea from "./components/EditorArea";
 import BottomPanel from "./components/BottomPanel";
 import StatusBar from "./components/StatusBar";
 import WelcomeScreen from "./components/WelcomeScreen";
-import NewProjectDialog from "./components/NewProjectDialog";
-import NodeInstallDialog from "./components/NodeInstallDialog";
-import RightPanel from "./components/RightPanel";
+import QuickOpen from "./components/QuickOpen";
 
 export default function App() {
   const s = useStudio();
-  const { t } = useI18n();
-  const [leftW, setLeftW] = useState(240);
-  const [rightW, setRightW] = useState(300);
-  const [bottomH, setBottomH] = useState(230);
-  const [bottomVisible, setBottomVisible] = useState(true);
-  const dragging = useRef<null | "left" | "right" | "bottom">(null);
+  const [leftWidth, setLeftWidth] = useState(260);
+  const [bottomHeight, setBottomHeight] = useState(240);
+  const dragging = useRef<null | "left" | "bottom">(null);
 
-  // Handle "Open Project" dialog from anywhere (menu / welcome).
+  // "Open Folder" from the menu / welcome screen.
   useEffect(() => {
-    if (s.dialog === "open") {
-      (async () => {
-        const dir = await api.pickDirectory();
-        if (dir) await s.doOpenProject(dir);
-        s.setDialog(null);
-      })();
-    }
+    if (s.dialog !== "open") return;
+    void (async () => {
+      const directory = await api.pickDirectory();
+      if (directory) await s.openWorkspace(directory);
+      s.setDialog(null);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.dialog]);
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
+    const onMove = (event: MouseEvent) => {
       if (!dragging.current) return;
-      if (dragging.current === "left") setLeftW(Math.max(160, Math.min(480, e.clientX - 28)));
-      if (dragging.current === "right") setRightW(Math.max(240, Math.min(640, window.innerWidth - e.clientX)));
-      if (dragging.current === "bottom") setBottomH(Math.max(120, Math.min(500, window.innerHeight - e.clientY - 24)));
+      if (dragging.current === "left") {
+        setLeftWidth(Math.max(180, Math.min(520, event.clientX - 40)));
+      }
+      if (dragging.current === "bottom") {
+        setBottomHeight(Math.max(120, Math.min(560, window.innerHeight - event.clientY - 24)));
+      }
     };
-    const onUp = () => (dragging.current = null);
+    const onUp = () => {
+      dragging.current = null;
+    };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     return () => {
@@ -52,125 +48,61 @@ export default function App() {
     };
   }, []);
 
-  // The phone preview needs more room than the manifest form.
-  useEffect(() => {
-    if (s.rightOpen && s.rightTab === "preview") setRightW((w) => Math.max(w, 380));
-  }, [s.rightOpen, s.rightTab]);
-
-  if (!s.project) {
-    return (
-      <div className="h-screen flex flex-col overflow-hidden">
-        {/* The window has `decorations: false`, so the title bar is the frame:
-            it must stay mounted on the welcome screen too. */}
-        <TitleBar />
-        <div className="flex-1 min-h-0">
-          <WelcomeScreen />
-        </div>
-        <NewProjectDialog />
-        {s.toast && <Toast msg={s.toast} />}
-      </div>
-    );
-  }
-
-  const stripIcon = (Icon: any, active: boolean, title: string, onClick: () => void) => (
-    <button
-      key={title}
-      title={title}
-      onClick={onClick}
-      className={`w-7 h-7 grid place-items-center border-l-2 ${active ? "border-darcula-accent text-white bg-white/5" : "border-transparent text-darcula-dim hover:text-white"}`}
-    >
-      <Icon size={15} />
-    </button>
-  );
-
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="flex h-screen flex-col overflow-hidden bg-vs-sidebar text-vs-text">
       <TopBar />
 
-      <div className="flex-1 flex min-h-0">
-        {/* Left tool strip */}
-        <div className="w-7 bg-darcula-panel border-r border-black/40 flex flex-col items-center py-1 gap-0.5 shrink-0">
-          {stripIcon(FolderTree, true, t("tree.title"), () => {})}
-          {stripIcon(Braces, false, t("strip.structure"), () => s.showToast(t("toast.structureSoon")))}
-          {stripIcon(GitBranch, false, "Git", () => s.showToast(t("toast.gitSoon")))}
-          <div className="flex-1" />
-          {stripIcon(Hammer, bottomVisible && s.bottomTab === "build", t("bottom.tab.build"), () => { setBottomVisible(true); s.setBottomTab("build"); })}
-          {stripIcon(Smartphone, s.rightOpen && s.rightTab === "preview", t("bottom.tab.preview"), () => {
-            s.setRightOpen(true);
-            s.setRightTab("preview");
-            if (!s.previewUrl) void s.runPreview();
-          })}
-          <button
-            title={bottomVisible ? t("strip.hideTools") : t("strip.showTools")}
-            onClick={() => setBottomVisible((v) => !v)}
-            className="w-7 h-7 grid place-items-center text-darcula-dim hover:text-white"
-          >
-            <ChevronDown size={15} className={bottomVisible ? "" : "rotate-180"} />
-          </button>
+      {!s.workspace ? (
+        <div className="min-h-0 flex-1">
+          <WelcomeScreen />
         </div>
+      ) : (
+        <div className="flex min-h-0 flex-1">
+          <ActivityBar />
 
-        {/* Project tree */}
-        <div style={{ width: leftW }} className="shrink-0 min-w-0">
-          <ProjectTree />
-        </div>
-        <div
-          className="w-1 cursor-col-resize bg-transparent hover:bg-darcula-accent/50 shrink-0"
-          onMouseDown={() => (dragging.current = "left")}
-        />
+          {s.sidebarVisible && (
+            <>
+              <div style={{ width: leftWidth }} className="min-w-0 shrink-0">
+                <Sidebar />
+              </div>
+              <div
+                className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-vs-accent/40"
+                onMouseDown={() => (dragging.current = "left")}
+              />
+            </>
+          )}
 
-        {/* Center: editor + bottom */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-1 min-h-0">
-            <EditorArea />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1">
+              <EditorArea />
+            </div>
+
+            {s.bottomVisible && (
+              <div
+                className="h-1 shrink-0 cursor-row-resize bg-transparent hover:bg-vs-accent/40"
+                onMouseDown={() => (dragging.current = "bottom")}
+              />
+            )}
+            {s.bottomVisible && (
+              <div style={{ height: bottomHeight }} className="min-h-0 shrink-0">
+                <BottomPanel onHide={() => s.setBottomVisible(false)} />
+              </div>
+            )}
           </div>
-          {bottomVisible && (
-            <div
-              className="h-1 cursor-row-resize bg-transparent hover:bg-darcula-accent/50 shrink-0"
-              onMouseDown={() => (dragging.current = "bottom")}
-            />
-          )}
-          {bottomVisible && (
-            <div style={{ height: bottomH }} className="shrink-0 min-h-0">
-              <BottomPanel onHide={() => setBottomVisible(false)} />
-            </div>
-          )}
         </div>
-
-        {/* Right tool window: Manifest + Preview */}
-        {s.rightOpen && (
-          <>
-            <div
-              className="w-1 cursor-col-resize bg-transparent hover:bg-darcula-accent/50 shrink-0"
-              onMouseDown={() => (dragging.current = "right")}
-            />
-            <div style={{ width: rightW }} className="shrink-0 min-w-0">
-              <RightPanel onClose={() => s.setRightOpen(false)} />
-            </div>
-          </>
-        )}
-        {!s.rightOpen && (
-          <button
-            className="w-6 bg-darcula-panel border-l border-black/40 text-darcula-dim hover:text-white text-2xs [writing-mode:vertical-rl] flex items-center justify-center gap-2"
-            onClick={() => s.setRightOpen(true)}
-            title={t("manifest.show")}
-          >
-            <Braces size={12} /> Manifest
-          </button>
-        )}
-      </div>
+      )}
 
       <StatusBar />
-      <NewProjectDialog />
-      <NodeInstallDialog />
-      {s.toast && <Toast msg={s.toast} />}
+      <QuickOpen />
+      {s.toast && <Toast message={s.toast} />}
     </div>
   );
 }
 
-function Toast({ msg }: { msg: string }) {
+function Toast({ message }: { message: string }) {
   return (
-    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded bg-[#214283] text-white text-xs shadow-2xl border border-darcula-accent/40">
-      {msg}
+    <div className="fixed bottom-10 left-1/2 z-[100] -translate-x-1/2 rounded border border-vs-border border-l-2 border-l-vs-accent bg-vs-editor px-4 py-2 text-2xs text-vs-strong shadow-xl">
+      {message}
     </div>
   );
 }

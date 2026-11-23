@@ -1,41 +1,55 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   api,
   fileLanguage,
   fileName,
-  onBuildDone,
-  onBuildLog,
-  type BuildDone,
-  type BuildLogLine,
-  type CreateProjectArgs,
+  onTerminalDone,
+  onTerminalOutput,
+  type EditorLanguage,
   type FileNode,
-  type ProjectInfo,
-  type RecentProject,
+  type RecentWorkspace,
+  type SearchFile,
+  type WorkspaceInfo,
 } from "./api";
-import { useI18n } from "./i18n";
-import { checkNode, installNode } from "./node";
 
 export type OpenFile = {
   path: string;
   name: string;
-  language: ReturnType<typeof fileLanguage>;
+  language: EditorLanguage;
   content: string;
   dirty: boolean;
 };
 
-export type BottomTab = "build" | "run" | "terminal";
-export type RightTab = "manifest" | "preview";
-export type NodeDialogState = null | "ask" | "installing" | "failed";
+export type SidebarView = "explorer" | "search" | "git" | "extensions";
+export type BottomTab = "problems" | "output" | "terminal";
+export type LogStream = "stdout" | "stderr" | "info" | "error" | "system";
+export type LogLine = { stream: LogStream; line: string };
+export type RevealTarget = { path: string; line: number; column: number; nonce: number };
+
+type SearchState = {
+  query: string;
+  caseSensitive: boolean;
+  results: SearchFile[];
+  running: boolean;
+  error: string | null;
+};
 
 /**
  * UI zoom: `--ui-scale` multiplies the `html` font size, and every rem-based
- * Tailwind size (text, spacing, icon boxes) follows it. Defaults to 1.15 because
- * a 100% desktop UI reads too small on high-DPI screens.
+ * Tailwind size follows it. Defaults to 1.1 so the light UI reads comfortably
+ * on high-DPI screens.
  */
-const UI_SCALE_KEY = "qchat.uiScale";
-const UI_SCALE_DEFAULT = 1.15;
-const UI_SCALE_MIN = 0.85;
-const UI_SCALE_MAX = 1.8;
+const UI_SCALE_KEY = "npqcode.uiScale";
+const UI_SCALE_DEFAULT = 1.1;
+const UI_SCALE_MIN = 0.8;
+const UI_SCALE_MAX = 1.6;
 const UI_SCALE_STEP = 0.05;
 
 function clampScale(n: number) {
@@ -45,102 +59,120 @@ function clampScale(n: number) {
 function readStoredScale() {
   try {
     const saved = Number(window.localStorage.getItem(UI_SCALE_KEY));
-    if (Number.isFinite(saved) && saved >= UI_SCALE_MIN && saved <= UI_SCALE_MAX) return clampScale(saved);
+    if (Number.isFinite(saved) && saved >= UI_SCALE_MIN && saved <= UI_SCALE_MAX) {
+      return clampScale(saved);
+    }
   } catch {
     /* storage unavailable */
   }
   return UI_SCALE_DEFAULT;
 }
 
+function joinPath(dir: string, name: string) {
+  return dir.replace(/[\\/]+$/, "") + "/" + name;
+}
+
 type StudioState = {
-  project: ProjectInfo | null;
+  workspace: WorkspaceInfo | null;
   tree: FileNode | null;
-  recent: RecentProject[];
+  recent: RecentWorkspace[];
   openFiles: OpenFile[];
   activePath: string | null;
-  buildLogs: BuildLogLine[];
-  buildRunning: boolean;
-  buildResult: BuildDone | null;
-  previewUrl: string | null;
+  sidebarView: SidebarView;
+  sidebarVisible: boolean;
+  bottomVisible: boolean;
   bottomTab: BottomTab;
-  rightOpen: boolean;
-  rightTab: RightTab;
+  output: LogLine[];
+  terminal: LogLine[];
+  terminalRunning: number | null;
+  search: SearchState;
+  searchFocusNonce: number;
+  reveal: RevealTarget | null;
+  quickOpen: boolean;
   cursor: { line: number; col: number };
-  dialog: null | "new" | "open";
+  dialog: null | "open";
   toast: string | null;
   uiScale: number;
-  nodeDialog: NodeDialogState;
-  nodeCanAutoInstall: boolean;
-  nodeError: string | null;
-  clearBuildLogs: () => void;
+
   loadRecent: () => void;
-  doOpenProject: (path: string) => Promise<void>;
-  doCreateProject: (args: CreateProjectArgs) => Promise<void>;
-  closeProject: () => void;
+  openWorkspace: (path: string) => Promise<void>;
+  closeWorkspace: () => void;
   refreshTree: () => void;
   openFile: (path: string) => Promise<void>;
+  openFileAt: (path: string, line?: number, column?: number) => Promise<void>;
   closeTab: (path: string) => void;
+  closeOtherTabs: (path: string) => void;
+  closeAllTabs: () => void;
   setActive: (path: string) => void;
   updateContent: (path: string, content: string) => void;
   saveFile: (path: string) => Promise<void>;
   saveAll: () => Promise<void>;
-  runBuild: () => Promise<void>;
-  runPreview: () => Promise<void>;
-  confirmNodeInstall: () => Promise<void>;
-  declineNodeInstall: () => void;
-  closeNodeDialog: () => void;
-  setBottomTab: (t: BottomTab) => void;
-  setRightOpen: (v: boolean) => void;
-  setRightTab: (t: RightTab) => void;
-  setUiScale: (n: number) => void;
+  deleteFile: (path: string) => Promise<void>;
+  newFile: (dir: string, name: string) => Promise<void>;
+  newFolder: (dir: string, name: string) => Promise<void>;
+  renamePath: (oldPath: string, newPath: string) => Promise<void>;
+  runCommand: (command: string) => Promise<void>;
+  stopCommand: () => Promise<void>;
+  clearTerminal: () => void;
+  clearOutput: () => void;
+  appendOutput: (line: string, stream?: LogStream) => void;
+  searchWorkspace: (query: string, caseSensitive: boolean) => Promise<void>;
+  openSearch: () => void;
+  setSidebarView: (view: SidebarView) => void;
+  toggleSidebar: () => void;
+  setBottomTab: (tab: BottomTab) => void;
+  toggleTerminal: () => void;
+  setBottomVisible: (visible: boolean) => void;
+  setQuickOpen: (open: boolean) => void;
+  setCursor: (line: number, col: number) => void;
+  setDialog: (dialog: null | "open") => void;
+  showToast: (message: string) => void;
+  setUiScale: (scale: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
-  setCursor: (line: number, col: number) => void;
-  setDialog: (d: null | "new" | "open") => void;
-  showToast: (msg: string) => void;
-  deleteFile: (path: string) => Promise<void>;
-  newFile: (dir: string, name: string) => Promise<void>;
   removeRecent: (path: string) => void;
-  updateManifest: (patch: Partial<ProjectInfo> & { permissions?: string[] }) => Promise<void>;
 };
 
 const Ctx = createContext<StudioState | null>(null);
 
 export function useStudio(): StudioState {
-  const v = useContext(Ctx);
-  if (!v) throw new Error("useStudio outside provider");
-  return v;
+  const value = useContext(Ctx);
+  if (!value) throw new Error("useStudio must be used inside <StudioProvider>");
+  return value;
 }
 
 export function StudioProvider({ children }: { children: React.ReactNode }) {
-  const [project, setProject] = useState<ProjectInfo | null>(null);
+  const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
   const [tree, setTree] = useState<FileNode | null>(null);
-  const [recent, setRecent] = useState<RecentProject[]>([]);
+  const [recent, setRecent] = useState<RecentWorkspace[]>([]);
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
-  const [buildLogs, setBuildLogs] = useState<BuildLogLine[]>([]);
-  const [buildRunning, setBuildRunning] = useState(false);
-  const [buildResult, setBuildResult] = useState<BuildDone | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [bottomTab, setBottomTab] = useState<BottomTab>("build");
-  const [rightOpen, setRightOpen] = useState(true);
-  const [rightTab, setRightTab] = useState<RightTab>("manifest");
+  const [sidebarView, setSidebarView] = useState<SidebarView>("explorer");
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [bottomVisible, setBottomVisible] = useState(false);
+  const [bottomTab, setBottomTab] = useState<BottomTab>("terminal");
+  const [output, setOutput] = useState<LogLine[]>([]);
+  const [terminal, setTerminal] = useState<LogLine[]>([]);
+  const [terminalRunning, setTerminalRunning] = useState<number | null>(null);
+  const [search, setSearch] = useState<SearchState>({
+    query: "",
+    caseSensitive: false,
+    results: [],
+    running: false,
+    error: null,
+  });
+  const [searchFocusNonce, setSearchFocusNonce] = useState(0);
+  const [reveal, setReveal] = useState<RevealTarget | null>(null);
+  const [quickOpen, setQuickOpen] = useState(false);
   const [cursor, setCursor] = useState({ line: 1, col: 1 });
-  const [dialog, setDialog] = useState<null | "new" | "open">(null);
+  const [dialog, setDialog] = useState<null | "open">(null);
   const [toast, setToast] = useState<string | null>(null);
   const [uiScale, setUiScale] = useState(readStoredScale);
-  const [nodeDialog, setNodeDialog] = useState<NodeDialogState>(null);
-  const [nodeCanAutoInstall, setNodeCanAutoInstall] = useState(false);
-  const [nodeError, setNodeError] = useState<string | null>(null);
   const toastTimer = useRef<number | null>(null);
-
-  // `t` with a stable identity (reads the current language through a ref), so the
-  // callbacks / subscriptions below are not recreated every time the language changes.
-  const { t: tCurrent } = useI18n();
-  const tRef = useRef(tCurrent);
-  tRef.current = tCurrent;
-  const t = useCallback<typeof tCurrent>((key, vars) => tRef.current(key, vars), []);
+  const searchSeq = useRef(0);
+  const revealSeq = useRef(0);
+  const finishedCommands = useRef<Set<number>>(new Set());
 
   // Apply + persist the UI zoom. `--ui-scale` is consumed by `html` in index.css.
   useEffect(() => {
@@ -152,11 +184,10 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     }
   }, [uiScale]);
 
-  const zoomIn = useCallback(() => setUiScale((s) => clampScale(s + UI_SCALE_STEP)), []);
-  const zoomOut = useCallback(() => setUiScale((s) => clampScale(s - UI_SCALE_STEP)), []);
+  const zoomIn = useCallback(() => setUiScale((scale) => clampScale(scale + UI_SCALE_STEP)), []);
+  const zoomOut = useCallback(() => setUiScale((scale) => clampScale(scale - UI_SCALE_STEP)), []);
   const resetZoom = useCallback(() => setUiScale(UI_SCALE_DEFAULT), []);
 
-  // Ctrl/Cmd + `+` / `-` / `0` — the shortcuts an IDE user expects.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
@@ -175,295 +206,484 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [zoomIn, zoomOut, resetZoom]);
 
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
+  const showToast = useCallback((message: string) => {
+    setToast(message);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), 3200);
+    toastTimer.current = window.setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  const appendOutput = useCallback((line: string, stream: LogStream = "info") => {
+    setOutput((prev) => [...prev.slice(-500), { stream, line }]);
   }, []);
 
   const loadRecent = useCallback(() => {
-    api.recentProjects().then(setRecent).catch(() => {});
+    api.recentWorkspaces().then(setRecent).catch(() => {});
   }, []);
 
   useEffect(() => {
     loadRecent();
-    let unlog: (() => void) | undefined;
-    let undone: (() => void) | undefined;
-    onBuildLog((line) => setBuildLogs((prev) => [...prev.slice(-400), line])).then((u) => (unlog = u));
-    onBuildDone((r) => {
-      setBuildRunning(false);
-      setBuildResult(r);
-      setBottomTab("build");
-      showToast(t(r.success ? "toast.buildSucceeded" : "toast.buildFailed"));
-    }).then((u) => (undone = u));
+    let cancelled = false;
+    let unOutput: (() => void) | undefined;
+    let unDone: (() => void) | undefined;
+    onTerminalOutput((event) => {
+      setTerminal((prev) => [
+        ...prev.slice(-2000),
+        { stream: event.stream === "stderr" ? "stderr" : "stdout", line: event.line },
+      ]);
+    }).then((unlisten) => {
+      if (cancelled) unlisten();
+      else unOutput = unlisten;
+    });
+    onTerminalDone((done) => {
+      setTerminalRunning((current) => (current === done.id ? null : current));
+      finishedCommands.current.add(done.id);
+      setTerminal((prev) => [
+        ...prev.slice(-2000),
+        {
+          stream: done.success ? "system" : "error",
+          line: `Process exited with code ${done.code}`,
+        },
+      ]);
+    }).then((unlisten) => {
+      if (cancelled) unlisten();
+      else unDone = unlisten;
+    });
     return () => {
-      unlog?.();
-      undone?.();
+      cancelled = true;
+      unOutput?.();
+      unDone?.();
     };
-  }, [loadRecent, showToast, t]);
+  }, [loadRecent]);
 
   const refreshTree = useCallback(() => {
-    if (!project) return;
-    api.listTree(project.path).then(setTree).catch((e) => showToast(String(e)));
-  }, [project, showToast]);
+    if (!workspace) return;
+    api
+      .listTree(workspace.path)
+      .then(setTree)
+      .catch((error) => showToast(String(error)));
+  }, [workspace, showToast]);
 
-  const doOpenProject = useCallback(
+  const openFile = useCallback(
     async (path: string) => {
+      setActivePath(path);
+      if (openFiles.some((file) => file.path === path)) return;
       try {
-        const info = await api.openProject(path);
-        setProject(info);
-        setOpenFiles([]);
-        setActivePath(null);
-        setBuildResult(null);
-        setPreviewUrl(null);
-        setBuildLogs([]);
-        loadRecent();
-        const fileTree = await api.listTree(path);
-        setTree(fileTree);
-        // Auto-open manifest + App.tsx
-        const manifestPath = path + "/qchat.manifest.json";
-        const appPath = path + "/src/App.tsx";
-        await openFilePath(manifestPath);
-        await openFilePath(appPath);
-        showToast(t("toast.opened", { name: info.name }));
-      } catch (e) {
-        showToast(String(e));
+        const content = await api.readFile(path);
+        setOpenFiles((prev) => {
+          if (prev.some((file) => file.path === path)) return prev;
+          return [
+            ...prev,
+            { path, name: fileName(path), language: fileLanguage(path), content, dirty: false },
+          ];
+        });
+      } catch (error) {
+        showToast(String(error));
+        setActivePath((current) => (current === path ? null : current));
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loadRecent, showToast, t],
+    [openFiles, showToast],
   );
 
-  const openFilePath = useCallback(async (path: string) => {
-    setOpenFiles((prev) => {
-      if (prev.some((f) => f.path === path)) return prev;
-      return prev;
-    });
-    setActivePath(path);
-    try {
-      const content = await api.readFile(path);
-      setOpenFiles((prev) => {
-        if (prev.some((f) => f.path === path)) {
-          return prev.map((f) => (f.path === path ? { ...f, content } : f));
-        }
-        return [
-          ...prev,
-          { path, name: fileName(path), language: fileLanguage(path), content, dirty: false },
-        ];
-      });
-    } catch (e) {
-      showToast(String(e));
-    }
-  }, [showToast]);
-
-  const doCreateProject = useCallback(
-    async (args: CreateProjectArgs) => {
-      const path = await api.createProject(args);
-      setDialog(null);
-      await doOpenProject(path);
+  const openFileAt = useCallback(
+    async (path: string, line = 1, column = 1) => {
+      await openFile(path);
+      revealSeq.current += 1;
+      setReveal({ path, line, column, nonce: revealSeq.current });
     },
-    [doOpenProject],
+    [openFile],
   );
 
-  const closeProject = useCallback(() => {
-    setProject(null);
+  const openWorkspace = useCallback(
+    async (path: string) => {
+      try {
+        const info = await api.openWorkspace(path);
+        setWorkspace(info);
+        setOpenFiles([]);
+        setActivePath(null);
+        setTerminal([]);
+        setTerminalRunning(null);
+        setSearch({ query: "", caseSensitive: false, results: [], running: false, error: null });
+        setBottomVisible(false);
+        const nextTree = await api.listTree(info.path);
+        setTree(nextTree);
+        loadRecent();
+        appendOutput(`Opened folder ${info.path}`);
+        showToast(`Opened ${info.name}`);
+        setSidebarView("explorer");
+        setSidebarVisible(true);
+      } catch (error) {
+        showToast(String(error));
+      }
+    },
+    [appendOutput, loadRecent, showToast],
+  );
+
+  const closeWorkspace = useCallback(() => {
+    for (const file of openFiles) {
+      if (file.dirty) void api.writeFile(file.path, file.content).catch(() => {});
+    }
+    void api.stopAllCommands().catch(() => {});
+    setWorkspace(null);
     setTree(null);
     setOpenFiles([]);
     setActivePath(null);
-    setBuildLogs([]);
-    setBuildResult(null);
-    setPreviewUrl(null);
+    setTerminal([]);
+    setTerminalRunning(null);
+    setOutput([]);
+    setSearch({ query: "", caseSensitive: false, results: [], running: false, error: null });
+    setBottomVisible(false);
     loadRecent();
-  }, [loadRecent]);
+  }, [loadRecent, openFiles]);
 
   const closeTab = useCallback(
     (path: string) => {
+      const closing = openFiles.find((file) => file.path === path);
+      if (closing?.dirty) void api.writeFile(path, closing.content).catch(() => {});
       setOpenFiles((prev) => {
-        const idx = prev.findIndex((f) => f.path === path);
-        const next = prev.filter((f) => f.path !== path);
+        const next = prev.filter((file) => file.path !== path);
         if (activePath === path) {
-          const newActive = next[Math.min(idx, next.length - 1)];
-          setActivePath(newActive ? newActive.path : null);
-        }
-        // Auto-save on close
-        const closing = prev.find((f) => f.path === path);
-        if (closing?.dirty) {
-          api.writeFile(path, closing.content).catch(() => {});
+          const index = prev.findIndex((file) => file.path === path);
+          const nextActive = next[Math.min(index, Math.max(next.length - 1, 0))];
+          setActivePath(nextActive ? nextActive.path : null);
         }
         return next;
       });
     },
-    [activePath],
+    [activePath, openFiles],
   );
+
+  const closeOtherTabs = useCallback(
+    (path: string) => {
+      for (const file of openFiles) {
+        if (file.path !== path && file.dirty) void api.writeFile(file.path, file.content).catch(() => {});
+      }
+      setOpenFiles((prev) => prev.filter((file) => file.path === path));
+      setActivePath(path);
+    },
+    [openFiles],
+  );
+
+  const closeAllTabs = useCallback(() => {
+    for (const file of openFiles) {
+      if (file.dirty) void api.writeFile(file.path, file.content).catch(() => {});
+    }
+    setOpenFiles([]);
+    setActivePath(null);
+  }, [openFiles]);
 
   const setActive = useCallback((path: string) => setActivePath(path), []);
 
   const updateContent = useCallback((path: string, content: string) => {
-    setOpenFiles((prev) => prev.map((f) => (f.path === path ? { ...f, content, dirty: true } : f)));
+    setOpenFiles((prev) =>
+      prev.map((file) => (file.path === path ? { ...file, content, dirty: true } : file)),
+    );
   }, []);
 
   const saveFile = useCallback(
     async (path: string) => {
-      const f = openFiles.find((x) => x.path === path);
-      if (!f || !f.dirty) return;
-      await api.writeFile(path, f.content);
-      setOpenFiles((prev) => prev.map((x) => (x.path === path ? { ...x, dirty: false } : x)));
-      if (path.endsWith("qchat.manifest.json")) {
-        // reload project info
-        if (project) api.openProject(project.path).then(setProject).catch(() => {});
+      const file = openFiles.find((item) => item.path === path);
+      if (!file || !file.dirty) return;
+      try {
+        await api.writeFile(path, file.content);
+        setOpenFiles((prev) =>
+          prev.map((item) => (item.path === path ? { ...item, dirty: false } : item)),
+        );
+        appendOutput(`Saved ${file.name}`);
+        showToast(`Saved ${file.name}`);
+      } catch (error) {
+        appendOutput(String(error), "error");
+        showToast(String(error));
       }
-      showToast(t("toast.fileSaved"));
     },
-    [openFiles, project, showToast, t],
+    [appendOutput, openFiles, showToast],
   );
 
   const saveAll = useCallback(async () => {
-    for (const f of openFiles) {
-      if (f.dirty) await api.writeFile(f.path, f.content);
-    }
-    setOpenFiles((prev) => prev.map((x) => ({ ...x, dirty: false })));
-    showToast(t("toast.allSaved"));
-  }, [openFiles, showToast, t]);
-
-  const clearBuildLogs = useCallback(() => {
-    setBuildLogs([]);
-    setBuildResult(null);
-  }, []);
-
-  /** Saves everything and starts the real build (Node.js is known to be available). */
-  const startBuild = useCallback(async () => {
-    if (!project) return;
-    await saveAll();
-    setBuildLogs([]);
-    setBuildResult(null);
-    setBuildRunning(true);
-    setBottomTab("build");
+    const dirtyFiles = openFiles.filter((file) => file.dirty);
+    if (dirtyFiles.length === 0) return;
     try {
-      await api.buildProject(project.path);
-    } catch (e) {
-      setBuildRunning(false);
-      showToast(String(e));
+      for (const file of dirtyFiles) await api.writeFile(file.path, file.content);
+      setOpenFiles((prev) => prev.map((file) => ({ ...file, dirty: false })));
+      appendOutput(`Saved ${dirtyFiles.length} file${dirtyFiles.length === 1 ? "" : "s"}`);
+      showToast("All changes saved");
+    } catch (error) {
+      appendOutput(String(error), "error");
+      showToast(String(error));
     }
-  }, [project, saveAll, showToast]);
+  }, [appendOutput, openFiles, showToast]);
 
-  const runBuild = useCallback(async () => {
-    if (!project || buildRunning) return;
-    try {
-      const node = await checkNode();
-      if (!node.found) {
-        // Ask before doing anything: the build resumes only if the user agrees to install.
-        setNodeCanAutoInstall(node.can_auto_install);
-        setNodeError(null);
-        setNodeDialog("ask");
+  const runCommand = useCallback(
+    async (command: string) => {
+      if (!workspace) {
+        showToast("Open a folder first");
         return;
       }
-    } catch {
-      /* check unavailable: let the backend report a missing Node.js in the build log */
-    }
-    await startBuild();
-  }, [project, buildRunning, startBuild]);
-
-  const confirmNodeInstall = useCallback(async () => {
-    setNodeError(null);
-    setNodeDialog("installing");
-    setBottomTab("build");
-    setBuildLogs([]);
-    setBuildResult(null);
-    try {
-      const r = await installNode();
-      if (r.success) {
-        setNodeDialog(null);
-        showToast(t("toast.nodeInstalled"));
-        await startBuild();
-      } else {
-        setNodeError(r.message);
-        setNodeDialog("failed");
+      const trimmed = command.trim();
+      if (!trimmed) return;
+      setBottomVisible(true);
+      setBottomTab("terminal");
+      setTerminal((prev) => [...prev.slice(-2000), { stream: "info", line: `$ ${trimmed}` }]);
+      try {
+        const id = await api.runCommand(workspace.path, trimmed);
+        // A very fast command can report completion before this promise settles.
+        if (finishedCommands.current.delete(id)) setTerminalRunning(null);
+        else setTerminalRunning(id);
+      } catch (error) {
+        setTerminal((prev) => [...prev.slice(-2000), { stream: "error", line: String(error) }]);
+        showToast(String(error));
       }
-    } catch (e) {
-      setNodeError(String(e));
-      setNodeDialog("failed");
-    }
-  }, [startBuild, showToast, t]);
+    },
+    [showToast, workspace],
+  );
 
-  const declineNodeInstall = useCallback(() => {
-    setNodeDialog(null);
-    showToast(t("toast.nodeDeclined"));
-  }, [showToast, t]);
-
-  const closeNodeDialog = useCallback(() => setNodeDialog(null), []);
-
-  const runPreview = useCallback(async () => {
-    if (!project) return;
+  const stopCommand = useCallback(async () => {
+    if (terminalRunning === null) return;
     try {
-      const url = await api.startPreview(project.path);
-      setPreviewUrl(url + "?t=" + Date.now());
-      setRightTab("preview");
-      setRightOpen(true);
-      showToast(t("toast.previewStarted"));
-    } catch (e) {
-      showToast(String(e));
+      await api.stopCommand(terminalRunning);
+    } catch {
+      /* already exited */
     }
-  }, [project, showToast, t]);
+  }, [terminalRunning]);
+
+  const clearTerminal = useCallback(() => setTerminal([]), []);
+  const clearOutput = useCallback(() => setOutput([]), []);
+
+  const searchWorkspace = useCallback(
+    async (query: string, caseSensitive: boolean) => {
+      const seq = ++searchSeq.current;
+      setSearch((prev) => ({ ...prev, query, caseSensitive, error: null }));
+      if (!workspace || !query.trim()) {
+        setSearch((prev) => ({ ...prev, results: [], running: false }));
+        return;
+      }
+      setSearch((prev) => ({ ...prev, running: true }));
+      try {
+        const results = await api.searchWorkspace(workspace.path, query, caseSensitive);
+        if (searchSeq.current === seq) {
+          setSearch((prev) => ({ ...prev, results, running: false }));
+        }
+      } catch (error) {
+        if (searchSeq.current === seq) {
+          setSearch((prev) => ({ ...prev, running: false, error: String(error), results: [] }));
+        }
+      }
+    },
+    [workspace],
+  );
+
+  const openSearch = useCallback(() => {
+    setSidebarView("search");
+    setSidebarVisible(true);
+    setSearchFocusNonce((nonce) => nonce + 1);
+  }, []);
 
   const deleteFile = useCallback(
     async (path: string) => {
-      await api.deletePath(path);
-      setOpenFiles((prev) => prev.filter((f) => f.path !== path));
-      refreshTree();
+      try {
+        await api.deletePath(path);
+        setOpenFiles((prev) =>
+          prev.filter(
+            (file) => file.path !== path && !file.path.startsWith(path + "/") && !file.path.startsWith(path + "\\"),
+          ),
+        );
+        setActivePath((current) =>
+          current === path || current?.startsWith(path + "/") || current?.startsWith(path + "\\")
+            ? null
+            : current,
+        );
+        refreshTree();
+        appendOutput(`Deleted ${path}`);
+      } catch (error) {
+        showToast(String(error));
+      }
     },
-    [refreshTree],
+    [appendOutput, refreshTree, showToast],
   );
 
   const newFile = useCallback(
     async (dir: string, name: string) => {
-      await api.createFile(dir + "/" + name);
-      refreshTree();
-      openFilePath(dir + "/" + name);
+      const path = joinPath(dir, name);
+      try {
+        await api.createFile(path);
+        refreshTree();
+        await openFile(path);
+      } catch (error) {
+        showToast(String(error));
+      }
     },
-    [refreshTree, openFilePath],
+    [openFile, refreshTree, showToast],
   );
 
-  const updateManifest = useCallback(
-    async (patch: Partial<ProjectInfo> & { permissions?: string[] }) => {
-      if (!project) return;
-      const manifestPath = project.path + "/qchat.manifest.json";
-      let manifest: any = {};
+  const newFolder = useCallback(
+    async (dir: string, name: string) => {
       try {
-        manifest = JSON.parse(await api.readFile(manifestPath));
-      } catch {
-        manifest = {};
+        await api.createDirectory(joinPath(dir, name));
+        refreshTree();
+      } catch (error) {
+        showToast(String(error));
       }
-      if (patch.name) manifest.name = patch.name;
-      if (patch.description !== undefined) manifest.description = patch.description;
-      if (patch.version) manifest.version = patch.version;
-      if (patch.app_id) manifest.appId = patch.app_id;
-      if (patch.permissions) manifest.requestedPermissions = patch.permissions;
-      const content = JSON.stringify(manifest, null, 2) + "\n";
-      await api.writeFile(manifestPath, content);
-      setOpenFiles((prev) =>
-        prev.map((f) => (f.path === manifestPath ? { ...f, content, dirty: false } : f)),
-      );
-      const info = await api.openProject(project.path);
-      setProject(info);
-      showToast(t("toast.manifestUpdated"));
     },
-    [project, showToast, t],
+    [refreshTree, showToast],
   );
+
+  const renamePath = useCallback(
+    async (oldPath: string, newPath: string) => {
+      if (oldPath === newPath) return;
+      try {
+        await api.renamePath(oldPath, newPath);
+        const remap = (path: string) => {
+          if (path === oldPath) return newPath;
+          if (path.startsWith(oldPath + "/") || path.startsWith(oldPath + "\\")) {
+            return newPath + path.slice(oldPath.length);
+          }
+          return path;
+        };
+        setOpenFiles((prev) =>
+          prev.map((file) => {
+            const path = remap(file.path);
+            return path === file.path ? file : { ...file, path, name: fileName(path) };
+          }),
+        );
+        setActivePath((current) => (current ? remap(current) : current));
+        refreshTree();
+        appendOutput(`Renamed ${fileName(oldPath)} to ${fileName(newPath)}`);
+      } catch (error) {
+        showToast(String(error));
+      }
+    },
+    [appendOutput, refreshTree, showToast],
+  );
+
+  const setBottomTabAndShow = useCallback((tab: BottomTab) => {
+    setBottomTab(tab);
+    setBottomVisible(true);
+  }, []);
+
+  const toggleTerminal = useCallback(() => {
+    if (bottomVisible && bottomTab === "terminal") {
+      setBottomVisible(false);
+    } else {
+      setBottomTab("terminal");
+      setBottomVisible(true);
+    }
+  }, [bottomTab, bottomVisible]);
+
+  // Editor-independent shortcuts, mirroring VS Code's defaults.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const target = e.target;
+      const insideEditor = target instanceof Element && target.closest(".cm-editor") !== null;
+      const key = e.key.toLowerCase();
+      if (key === "p" && !e.shiftKey) {
+        e.preventDefault();
+        if (workspace) setQuickOpen(true);
+      } else if (key === "o" && !e.shiftKey) {
+        e.preventDefault();
+        setDialog("open");
+      } else if (key === "s" && e.shiftKey) {
+        e.preventDefault();
+        void saveAll();
+      } else if (key === "s") {
+        if (insideEditor) return; // CodeMirror's own Mod-s binding handles this one
+        e.preventDefault();
+        if (activePath) void saveFile(activePath);
+      } else if (key === "b" && !e.shiftKey) {
+        e.preventDefault();
+        setSidebarVisible((visible) => !visible);
+      } else if (key === "`") {
+        e.preventDefault();
+        toggleTerminal();
+      } else if (key === "w" && !e.shiftKey) {
+        e.preventDefault();
+        if (activePath) closeTab(activePath);
+      } else if (key === "f" && e.shiftKey) {
+        e.preventDefault();
+        setSidebarView("search");
+        setSidebarVisible(true);
+        setSearchFocusNonce((nonce) => nonce + 1);
+      } else if (key === "e" && e.shiftKey) {
+        e.preventDefault();
+        setSidebarView("explorer");
+        setSidebarVisible(true);
+      } else if (key === "m" && e.shiftKey) {
+        e.preventDefault();
+        setBottomTab("problems");
+        setBottomVisible(true);
+      } else if (key === "u" && e.shiftKey) {
+        e.preventDefault();
+        setBottomTab("output");
+        setBottomVisible(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activePath, closeTab, saveAll, saveFile, toggleTerminal, workspace]);
 
   const value: StudioState = {
-    project, tree, recent, openFiles, activePath, buildLogs, buildRunning, buildResult,
-    previewUrl, bottomTab, rightOpen, rightTab, cursor, dialog, toast, uiScale,
-    nodeDialog, nodeCanAutoInstall, nodeError,
-    loadRecent, doOpenProject, doCreateProject, closeProject, refreshTree,
-    openFile: openFilePath, closeTab, setActive, updateContent, saveFile, saveAll,
-    runBuild, runPreview, setBottomTab, setRightOpen, setRightTab, clearBuildLogs,
-    confirmNodeInstall, declineNodeInstall, closeNodeDialog,
-    setUiScale: (n: number) => setUiScale(clampScale(n)),
-    zoomIn, zoomOut, resetZoom,
+    workspace,
+    tree,
+    recent,
+    openFiles,
+    activePath,
+    sidebarView,
+    sidebarVisible,
+    bottomVisible,
+    bottomTab,
+    output,
+    terminal,
+    terminalRunning,
+    search,
+    searchFocusNonce,
+    reveal,
+    quickOpen,
+    cursor,
+    dialog,
+    toast,
+    uiScale,
+    loadRecent,
+    openWorkspace,
+    closeWorkspace,
+    refreshTree,
+    openFile,
+    openFileAt,
+    closeTab,
+    closeOtherTabs,
+    closeAllTabs,
+    setActive,
+    updateContent,
+    saveFile,
+    saveAll,
+    deleteFile,
+    newFile,
+    newFolder,
+    renamePath,
+    runCommand,
+    stopCommand,
+    clearTerminal,
+    clearOutput,
+    appendOutput,
+    searchWorkspace,
+    openSearch,
+    setSidebarView: (view: SidebarView) => {
+      setSidebarView(view);
+      setSidebarVisible(true);
+    },
+    toggleSidebar: () => setSidebarVisible((visible) => !visible),
+    setBottomTab: setBottomTabAndShow,
+    toggleTerminal,
+    setBottomVisible,
+    setQuickOpen,
     setCursor: (line: number, col: number) => setCursor({ line, col }),
-    setDialog, showToast,
-    deleteFile, newFile, updateManifest,
-    removeRecent: (path: string) => { api.removeRecent(path).then(loadRecent).catch(() => {}); },
+    setDialog,
+    showToast,
+    setUiScale: (scale: number) => setUiScale(clampScale(scale)),
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    removeRecent: (path: string) => {
+      api.removeRecent(path).then(loadRecent).catch(() => {});
+    },
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

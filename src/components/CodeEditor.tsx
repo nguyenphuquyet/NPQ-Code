@@ -1,68 +1,96 @@
 import { useEffect, useRef } from "react";
 import { EditorState, Extension } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection } from "@codemirror/view";
+import {
+  EditorView,
+  drawSelection,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  keymap,
+  lineNumbers,
+} from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { bracketMatching, HighlightStyle, indentOnInput, syntaxHighlighting } from "@codemirror/language";
+import {
+  bracketMatching,
+  HighlightStyle,
+  indentOnInput,
+  syntaxHighlighting,
+} from "@codemirror/language";
 import { javascript } from "@codemirror/lang-javascript";
 import { json } from "@codemirror/lang-json";
 import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
-import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from "@codemirror/autocomplete";
-import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+} from "@codemirror/autocomplete";
+import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
 import { tags as t } from "@lezer/highlight";
-import { setActiveEditor, getActiveEditor } from "../lib/editorBridge";
+import { getActiveEditor, setActiveEditor } from "../lib/editorBridge";
+import type { RevealTarget } from "../lib/store";
 
-const darculaHighlight = HighlightStyle.define([
-  { tag: t.keyword, color: "#CC7832" },
-  { tag: [t.controlKeyword, t.moduleKeyword], color: "#CC7832" },
-  { tag: [t.string, t.special(t.string), t.attributeValue], color: "#6A8759" },
-  { tag: [t.number, t.bool, t.null], color: "#6897BB" },
-  { tag: t.comment, color: "#7F7F7F", fontStyle: "italic" },
-  { tag: [t.function(t.variableName), t.function(t.propertyName)], color: "#FFC66D" },
-  { tag: t.definition(t.variableName), color: "#A9B7C6" },
-  { tag: [t.typeName, t.className, t.definition(t.typeName)], color: "#A9B7C6" },
-  { tag: [t.propertyName, t.attributeName], color: "#A9B7C6" },
-  { tag: [t.variableName], color: "#A9B7C6" },
-  { tag: [t.operator, t.punctuation], color: "#A9B7C6" },
-  { tag: [t.self, t.namespace], color: "#9876AA" },
-  { tag: t.meta, color: "#BBB529" },
-  { tag: t.tagName, color: "#E8BF6A" },
-  { tag: t.atom, color: "#9876AA" },
+const lightHighlight = HighlightStyle.define([
+  { tag: [t.keyword, t.controlKeyword, t.moduleKeyword], color: "#0000FF" },
+  { tag: [t.string, t.special(t.string), t.attributeValue], color: "#A31515" },
+  { tag: [t.number, t.bool, t.null], color: "#098658" },
+  { tag: t.comment, color: "#008000", fontStyle: "italic" },
+  { tag: [t.function(t.variableName), t.function(t.propertyName)], color: "#795E26" },
+  { tag: [t.definition(t.variableName), t.variableName], color: "#001080" },
+  { tag: [t.typeName, t.className, t.definition(t.typeName)], color: "#267F99" },
+  { tag: [t.propertyName, t.attributeName], color: "#001080" },
+  { tag: [t.operator, t.punctuation], color: "#1F1F1F" },
+  { tag: [t.self, t.namespace], color: "#7B3FA0" },
+  { tag: t.meta, color: "#0070C1" },
+  { tag: t.tagName, color: "#800000" },
+  { tag: t.atom, color: "#7B3FA0" },
   { tag: t.emphasis, fontStyle: "italic" },
   { tag: t.strong, fontWeight: "bold" },
-  { tag: t.link, color: "#6A8759", textDecoration: "underline" },
-  { tag: t.invalid, color: "#BC3F3C" },
+  { tag: t.link, color: "#0066B8", textDecoration: "underline" },
+  { tag: t.invalid, color: "#CD3131" },
 ]);
 
-const darculaTheme = EditorView.theme(
+const lightTheme = EditorView.theme(
   {
-    "&": { backgroundColor: "#2B2B2B", color: "#A9B7C6", height: "100%" },
-    ".cm-content": { caretColor: "#ffffff", padding: "8px 0" },
-    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "#ffffff" },
+    "&": { backgroundColor: "#FFFFFF", color: "#1F1F1F", height: "100%" },
+    ".cm-content": { caretColor: "#000000", padding: "8px 0" },
+    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "#000000" },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
-      backgroundColor: "#214283 !important",
+      backgroundColor: "#ADD6FF",
     },
-    ".cm-selectionMatch": { backgroundColor: "#21428355" },
-    ".cm-activeLine": { backgroundColor: "#323232" },
+    ".cm-selectionMatch": { backgroundColor: "#C9E4FB" },
+    ".cm-activeLine": { backgroundColor: "#F5F5F5" },
     ".cm-gutters": {
-      backgroundColor: "#313335",
-      color: "#606366",
+      backgroundColor: "#FFFFFF",
+      color: "#6E7681",
       border: "none",
-      borderRight: "1px solid #323232",
-      fontFamily: '"JetBrains Mono", monospace',
+      borderRight: "1px solid #F0F0F0",
     },
-    ".cm-activeLineGutter": { backgroundColor: "#323232", color: "#A4A3A3" },
-    ".cm-foldPlaceholder": { backgroundColor: "transparent", border: "none", color: "#ddd" },
-    ".cm-tooltip": { backgroundColor: "#3C3F41", border: "1px solid #4B4F52", color: "#BBBBBB" },
-    ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": { backgroundColor: "#214283", color: "#fff" },
-    ".cm-matchingBracket": { backgroundColor: "#3a5a3a", outline: "1px solid #59A869" },
-    ".cm-panels": { backgroundColor: "#3C3F41", color: "#BBBBBB" },
-    ".cm-panels.cm-panels-top": { borderBottom: "1px solid #323232" },
-    ".cm-panels.cm-panels-bottom": { borderTop: "1px solid #323232" },
-    ".cm-searchMatch": { backgroundColor: "#416730", outline: "1px solid #59A869" },
-    ".cm-searchMatch-selected": { backgroundColor: "#59A869" },
+    ".cm-activeLineGutter": { backgroundColor: "#F0F0F0", color: "#1F1F1F" },
+    ".cm-foldPlaceholder": {
+      backgroundColor: "#F3F3F3",
+      border: "1px solid #E2E2E2",
+      color: "#6B6B6B",
+    },
+    ".cm-tooltip": {
+      backgroundColor: "#FFFFFF",
+      border: "1px solid #C8C8C8",
+      color: "#1F1F1F",
+      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.12)",
+    },
+    ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {
+      backgroundColor: "#D7E8F8",
+      color: "#1F1F1F",
+    },
+    ".cm-matchingBracket": { backgroundColor: "#E5F3FF", outline: "1px solid #7FB4D9" },
+    ".cm-nonmatchingBracket": { color: "#CD3131" },
+    ".cm-panels": { backgroundColor: "#F3F3F3", color: "#1F1F1F" },
+    ".cm-panels.cm-panels-top": { borderBottom: "1px solid #E2E2E2" },
+    ".cm-panels.cm-panels-bottom": { borderTop: "1px solid #E2E2E2" },
+    ".cm-searchMatch": { backgroundColor: "#FFE9A8", outline: "1px solid #E2C45C" },
+    ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "#FFD166" },
   },
-  { dark: true },
+  { dark: false },
 );
 
 function languageFor(lang: string): Extension {
@@ -71,6 +99,8 @@ function languageFor(lang: string): Extension {
       return javascript({ jsx: true, typescript: true });
     case "ts":
       return javascript({ typescript: true });
+    case "jsx":
+      return javascript({ jsx: true });
     case "js":
       return javascript();
     case "json":
@@ -87,12 +117,20 @@ function languageFor(lang: string): Extension {
 type Props = {
   content: string;
   language: string;
-  onChange: (v: string) => void;
+  reveal?: RevealTarget | null;
+  onChange: (value: string) => void;
   onCursor: (line: number, col: number) => void;
   onSave: () => void;
 };
 
-export default function CodeEditor({ content, language, onChange, onCursor, onSave }: Props) {
+export default function CodeEditor({
+  content,
+  language,
+  reveal,
+  onChange,
+  onCursor,
+  onSave,
+}: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -113,13 +151,11 @@ export default function CodeEditor({ content, language, onChange, onCursor, onSa
         },
       },
     ]);
-    const updateListener = EditorView.updateListener.of((u) => {
-      if (u.docChanged) {
-        onChangeRef.current(u.state.doc.toString());
-      }
-      if (u.selectionSet) {
-        const head = u.state.selection.main.head;
-        const line = u.state.doc.lineAt(head);
+    const updateListener = EditorView.updateListener.of((update) => {
+      if (update.docChanged) onChangeRef.current(update.state.doc.toString());
+      if (update.selectionSet) {
+        const head = update.state.selection.main.head;
+        const line = update.state.doc.lineAt(head);
         onCursorRef.current(line.number, head - line.from + 1);
       }
     });
@@ -145,8 +181,8 @@ export default function CodeEditor({ content, language, onChange, onCursor, onSa
           indentWithTab,
         ]),
         saveKeymap,
-        syntaxHighlighting(darculaHighlight, { fallback: false }),
-        darculaTheme,
+        syntaxHighlighting(lightHighlight, { fallback: false }),
+        lightTheme,
         languageFor(language),
         updateListener,
         EditorView.lineWrapping,
@@ -155,8 +191,6 @@ export default function CodeEditor({ content, language, onChange, onCursor, onSa
     const view = new EditorView({ state, parent: hostRef.current });
     viewRef.current = view;
     setActiveEditor(view);
-    // initial cursor
-    const line = view.state.doc.lineAt(0);
     onCursorRef.current(1, 1);
     return () => {
       if (getActiveEditor() === view) setActiveEditor(null);
@@ -165,6 +199,22 @@ export default function CodeEditor({ content, language, onChange, onCursor, onSa
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language]);
+
+  // Jump to a search result / tree reveal without remounting the editor.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !reveal) return;
+    const lineNumber = Math.min(Math.max(1, reveal.line), view.state.doc.lines);
+    const line = view.state.doc.line(lineNumber);
+    const column = Math.min(Math.max(1, reveal.column), line.length + 1);
+    const position = line.from + column - 1;
+    view.dispatch({
+      selection: { anchor: position },
+      effects: EditorView.scrollIntoView(position, { y: "center" }),
+    });
+    view.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reveal?.nonce]);
 
   return <div ref={hostRef} className="h-full w-full overflow-hidden" />;
 }
