@@ -168,7 +168,7 @@ export default function BottomPanel({ onHide }: { onHide: () => void }) {
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden bg-vs-editor">
         <div className={s.bottomTab === "problems" ? "h-full" : "hidden"}>
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-2xs text-vs-dim">
             <CheckCircle2 size={22} className="text-vs-green" />

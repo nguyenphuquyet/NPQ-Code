@@ -261,7 +261,7 @@ export default function SettingsDialog() {
             NPQ Code 1.0.0 · {t(`theme.${theme}` as TranslationKey)}
           </span>
           <button
-            className="rounded bg-vs-accent px-3 py-1 text-2xs font-medium text-white hover:opacity-90"
+            className="rounded bg-vs-button px-3 py-1 text-2xs font-medium text-white hover:opacity-90"
             onClick={() => s.setSettingsOpen(false)}
           >
             {t("settings.close")}

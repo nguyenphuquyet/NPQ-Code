@@ -12,6 +12,9 @@ export default {
          */
         vs: {
           panel: "rgb(var(--vs-panel) / <alpha-value>)",
+          titlebar: "rgb(var(--vs-titlebar) / <alpha-value>)",
+          titlebarHover: "rgb(var(--vs-titlebar-hover) / <alpha-value>)",
+          tab: "rgb(var(--vs-tab) / <alpha-value>)",
           sidebar: "rgb(var(--vs-sidebar) / <alpha-value>)",
           activity: "rgb(var(--vs-activity) / <alpha-value>)",
           editor: "rgb(var(--vs-editor) / <alpha-value>)",
@@ -24,6 +27,7 @@ export default {
           strong: "rgb(var(--vs-strong) / <alpha-value>)",
           dim: "rgb(var(--vs-dim) / <alpha-value>)",
           accent: "rgb(var(--vs-accent) / <alpha-value>)",
+          button: "rgb(var(--vs-button) / <alpha-value>)",
           green: "rgb(var(--vs-green) / <alpha-value>)",
           red: "rgb(var(--vs-red) / <alpha-value>)",
           orange: "rgb(var(--vs-orange) / <alpha-value>)",

@@ -91,7 +91,7 @@ export default function EditorArea() {
               className={`group flex min-w-[130px] max-w-[220px] cursor-pointer items-center gap-1.5 border-r border-t-2 border-vs-border px-3 text-2xs ${
                 isActive
                   ? "border-t-vs-accent bg-vs-editor text-vs-strong"
-                  : "border-t-transparent bg-vs-panel text-vs-dim hover:bg-vs-hover"
+                  : "border-t-transparent bg-vs-tab text-vs-dim hover:bg-vs-hover"
               }`}
             >
               {tabIcon(file.name)}

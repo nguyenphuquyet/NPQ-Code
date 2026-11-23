@@ -227,7 +227,7 @@ export default function TopBar() {
 
   return (
     <div
-      className="drag-region relative z-40 flex h-9 shrink-0 select-none items-stretch border-b border-vs-border bg-vs-panel text-2xs"
+      className="drag-region relative z-40 flex h-9 shrink-0 select-none items-stretch border-b border-vs-border bg-vs-titlebar text-2xs"
       onMouseDown={onMouseDown}
       onDoubleClick={onDoubleClick}
     >
@@ -240,8 +240,8 @@ export default function TopBar() {
         {MENU_NAMES.map((name) => (
           <div key={name} className="relative flex items-stretch">
             <button
-              className={`px-2.5 text-vs-text hover:bg-vs-hover ${
-                openMenu === name ? "bg-vs-hover text-vs-strong" : ""
+              className={`px-2.5 text-vs-text hover:bg-vs-titlebarHover ${
+                openMenu === name ? "bg-vs-titlebarHover text-vs-strong" : ""
               }`}
               onMouseEnter={() => openMenu && setOpenMenu(name)}
               onClick={() => setOpenMenu(openMenu === name ? null : name)}
@@ -277,7 +277,7 @@ export default function TopBar() {
       <div className="flex min-w-0 flex-1 items-center justify-center px-3">
         <button
           onClick={() => (s.workspace ? s.setQuickOpen(true) : s.setDialog("open"))}
-          className="no-drag flex h-6 w-full max-w-[520px] items-center gap-2 rounded border border-vs-border bg-vs-editor px-2.5 text-vs-dim hover:border-vs-accent/60 hover:text-vs-text"
+          className="no-drag flex h-6 w-full max-w-[520px] items-center gap-2 rounded border border-vs-border bg-vs-input px-2.5 text-vs-dim hover:border-vs-accent/60 hover:text-vs-text"
           title={s.workspace ? t("topbar.searchFiles") : t("topbar.openFolder")}
         >
           <Search size={12} />
@@ -292,14 +292,14 @@ export default function TopBar() {
         <button
           onClick={() => winAction("minimize")}
           title={t("window.minimize")}
-          className="grid h-full w-11 place-items-center text-vs-text hover:bg-vs-hover"
+          className="grid h-full w-11 place-items-center text-vs-text hover:bg-vs-titlebarHover"
         >
           <CaptionGlyph kind="minimize" />
         </button>
         <button
           onClick={() => winAction("toggleMaximize")}
           title={t("window.maximize")}
-          className="grid h-full w-11 place-items-center text-vs-text hover:bg-vs-hover"
+          className="grid h-full w-11 place-items-center text-vs-text hover:bg-vs-titlebarHover"
         >
           <CaptionGlyph kind="maximize" />
         </button>

@@ -209,7 +209,7 @@ export default function ProjectTree() {
           <p>{t("explorer.noFolder")}</p>
           <button
             onClick={() => s.setDialog("open")}
-            className="mt-3 rounded bg-vs-accent px-3 py-1.5 text-white hover:opacity-90"
+            className="mt-3 rounded bg-vs-button px-3 py-1.5 text-white hover:opacity-90"
           >
             {t("explorer.openFolder")}
           </button>
