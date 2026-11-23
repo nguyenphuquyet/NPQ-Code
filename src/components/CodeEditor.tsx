@@ -60,7 +60,18 @@ const codeTheme = EditorView.theme(
     "&": { backgroundColor: "rgb(var(--cm-bg))", color: "rgb(var(--cm-fg))", height: "100%" },
     ".cm-content": { caretColor: "rgb(var(--cm-caret))", padding: "8px 0" },
     ".cm-cursor, .cm-dropCursor": { borderLeftColor: "rgb(var(--cm-caret))" },
-    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
+    /*
+     * CodeMirror's base theme ships `&light.cm-focused > .cm-scroller >
+     * .cm-selectionLayer .cm-selectionBackground { background: #d7d4f0 }`.
+     * That selector is 5 classes deep, so a plain `.cm-selectionBackground`
+     * rule loses to it and the editor keeps CodeMirror's pale lavender
+     * selection even in a dark theme. Match its specificity (and add
+     * `.cm-editor`) so the themed variable always wins.
+     */
+    "&.cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, & > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-content ::selection": {
+      backgroundColor: "rgb(var(--cm-selection))",
+    },
+    ".cm-selectionLayer .cm-selectionBackground": {
       backgroundColor: "rgb(var(--cm-selection))",
     },
     ".cm-selectionMatch": { backgroundColor: "rgb(var(--cm-selection-match))" },
