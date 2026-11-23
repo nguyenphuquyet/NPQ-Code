@@ -2,6 +2,307 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Themes
+ * ---------------------------------------------------------------------------
+ * Every colour in the UI resolves to a CSS variable defined below, so a theme
+ * switch only changes `<html data-theme="…">` and the whole shell repaints.
+ * Values are `R G B` triples (consumed by Tailwind as `rgb(var(--x) / a)`) —
+ * see tailwind.config.js. `--cm-*` and `--syn-*` belong to CodeMirror.
+ */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --vs-panel: 248 248 248;
+  --vs-sidebar: 243 243 243;
+  --vs-activity: 248 248 248;
+  --vs-editor: 255 255 255;
+  --vs-status: 0 122 204;
+  --vs-border: 226 226 226;
+  --vs-hover: 232 232 232;
+  --vs-select: 215 232 248;
+  --vs-select-border: 187 217 242;
+  --vs-text: 59 59 59;
+  --vs-strong: 31 31 31;
+  --vs-dim: 107 107 107;
+  --vs-accent: 0 102 184;
+  --vs-green: 22 130 93;
+  --vs-red: 205 49 49;
+  --vs-orange: 176 106 0;
+  --vs-yellow: 154 122 0;
+  --vs-purple: 123 63 160;
+  --vs-blue: 26 111 181;
+  --vs-modified: 0 102 184;
+  --vs-input: 255 255 255;
+  --vs-badge: 225 225 225;
+  --vs-highlight: 255 233 168;
+  --vs-selection: 173 214 255;
+  --vs-selection-text: 31 31 31;
+  --vs-scrollbar: 200 200 200;
+  --vs-scrollbar-hover: 168 168 168;
+
+  --cm-bg: 255 255 255;
+  --cm-fg: 31 31 31;
+  --cm-caret: 0 0 0;
+  --cm-selection: 173 214 255;
+  --cm-selection-match: 201 228 251;
+  --cm-active-line: 245 245 245;
+  --cm-gutter-bg: 255 255 255;
+  --cm-gutter-fg: 110 118 129;
+  --cm-gutter-border: 240 240 240;
+  --cm-active-gutter-bg: 240 240 240;
+  --cm-active-gutter-fg: 31 31 31;
+  --cm-fold-bg: 243 243 243;
+  --cm-fold-border: 226 226 226;
+  --cm-fold-fg: 107 107 107;
+  --cm-tooltip-bg: 255 255 255;
+  --cm-tooltip-border: 200 200 200;
+  --cm-accent-soft: 215 232 248;
+  --cm-bracket-bg: 229 243 255;
+  --cm-bracket-outline: 127 180 217;
+  --cm-panel-bg: 243 243 243;
+  --cm-panel-border: 226 226 226;
+  --cm-search-bg: 255 233 168;
+  --cm-search-outline: 226 196 92;
+  --cm-search-selected: 255 209 102;
+  --cm-invalid: 205 49 49;
+
+  --syn-keyword: 0 0 255;
+  --syn-string: 163 21 21;
+  --syn-number: 9 134 88;
+  --syn-comment: 0 128 0;
+  --syn-function: 121 94 38;
+  --syn-variable: 0 16 128;
+  --syn-type: 38 127 153;
+  --syn-property: 0 16 128;
+  --syn-operator: 31 31 31;
+  --syn-namespace: 123 63 160;
+  --syn-meta: 0 112 193;
+  --syn-tag: 128 0 0;
+  --syn-atom: 123 63 160;
+  --syn-link: 0 102 184;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --vs-panel: 60 60 60;
+  --vs-sidebar: 37 37 38;
+  --vs-activity: 51 51 51;
+  --vs-editor: 30 30 30;
+  --vs-status: 0 122 204;
+  --vs-border: 60 60 60;
+  --vs-hover: 42 45 46;
+  --vs-select: 9 71 113;
+  --vs-select-border: 0 120 212;
+  --vs-text: 204 204 204;
+  --vs-strong: 255 255 255;
+  --vs-dim: 157 157 157;
+  --vs-accent: 55 148 255;
+  --vs-green: 137 209 133;
+  --vs-red: 244 135 113;
+  --vs-orange: 204 167 0;
+  --vs-yellow: 220 220 170;
+  --vs-purple: 197 134 192;
+  --vs-blue: 117 190 255;
+  --vs-modified: 226 192 141;
+  --vs-input: 60 60 60;
+  --vs-badge: 77 77 77;
+  --vs-highlight: 97 50 20;
+  --vs-selection: 38 79 120;
+  --vs-selection-text: 255 255 255;
+  --vs-scrollbar: 121 121 121;
+  --vs-scrollbar-hover: 150 150 150;
+
+  --cm-bg: 30 30 30;
+  --cm-fg: 212 212 212;
+  --cm-caret: 174 175 173;
+  --cm-selection: 38 79 120;
+  --cm-selection-match: 58 61 65;
+  --cm-active-line: 35 35 35;
+  --cm-gutter-bg: 30 30 30;
+  --cm-gutter-fg: 133 133 133;
+  --cm-gutter-border: 43 43 43;
+  --cm-active-gutter-bg: 42 45 46;
+  --cm-active-gutter-fg: 198 198 198;
+  --cm-fold-bg: 37 37 38;
+  --cm-fold-border: 69 69 69;
+  --cm-fold-fg: 157 157 157;
+  --cm-tooltip-bg: 37 37 38;
+  --cm-tooltip-border: 69 69 69;
+  --cm-accent-soft: 9 71 113;
+  --cm-bracket-bg: 58 61 65;
+  --cm-bracket-outline: 136 136 136;
+  --cm-panel-bg: 30 30 30;
+  --cm-panel-border: 60 60 60;
+  --cm-search-bg: 97 50 20;
+  --cm-search-outline: 168 122 50;
+  --cm-search-selected: 158 106 0;
+  --cm-invalid: 244 71 71;
+
+  --syn-keyword: 86 156 214;
+  --syn-string: 206 145 120;
+  --syn-number: 181 206 168;
+  --syn-comment: 106 153 85;
+  --syn-function: 220 220 170;
+  --syn-variable: 156 220 254;
+  --syn-type: 78 201 176;
+  --syn-property: 156 220 254;
+  --syn-operator: 212 212 212;
+  --syn-namespace: 78 201 176;
+  --syn-meta: 86 156 214;
+  --syn-tag: 86 156 214;
+  --syn-atom: 86 156 214;
+  --syn-link: 55 148 255;
+}
+
+:root[data-theme="hc"] {
+  color-scheme: dark;
+
+  --vs-panel: 0 0 0;
+  --vs-sidebar: 0 0 0;
+  --vs-activity: 0 0 0;
+  --vs-editor: 0 0 0;
+  --vs-status: 0 0 0;
+  --vs-border: 111 195 223;
+  --vs-hover: 26 26 26;
+  --vs-select: 15 74 133;
+  --vs-select-border: 111 195 223;
+  --vs-text: 255 255 255;
+  --vs-strong: 255 255 255;
+  --vs-dim: 200 200 200;
+  --vs-accent: 33 166 255;
+  --vs-green: 137 209 133;
+  --vs-red: 255 106 106;
+  --vs-orange: 255 198 89;
+  --vs-yellow: 255 214 102;
+  --vs-purple: 214 168 255;
+  --vs-blue: 121 192 255;
+  --vs-modified: 255 198 89;
+  --vs-input: 0 0 0;
+  --vs-badge: 40 40 40;
+  --vs-highlight: 97 50 20;
+  --vs-selection: 15 74 133;
+  --vs-selection-text: 255 255 255;
+  --vs-scrollbar: 90 90 90;
+  --vs-scrollbar-hover: 130 130 130;
+
+  --cm-bg: 0 0 0;
+  --cm-fg: 255 255 255;
+  --cm-caret: 255 255 255;
+  --cm-selection: 15 74 133;
+  --cm-selection-match: 38 38 38;
+  --cm-active-line: 20 20 20;
+  --cm-gutter-bg: 0 0 0;
+  --cm-gutter-fg: 200 200 200;
+  --cm-gutter-border: 60 60 60;
+  --cm-active-gutter-bg: 20 20 20;
+  --cm-active-gutter-fg: 255 255 255;
+  --cm-fold-bg: 0 0 0;
+  --cm-fold-border: 111 195 223;
+  --cm-fold-fg: 255 255 255;
+  --cm-tooltip-bg: 0 0 0;
+  --cm-tooltip-border: 111 195 223;
+  --cm-accent-soft: 15 74 133;
+  --cm-bracket-bg: 15 74 133;
+  --cm-bracket-outline: 111 195 223;
+  --cm-panel-bg: 0 0 0;
+  --cm-panel-border: 111 195 223;
+  --cm-search-bg: 97 50 20;
+  --cm-search-outline: 255 214 102;
+  --cm-search-selected: 158 106 0;
+  --cm-invalid: 255 106 106;
+
+  --syn-keyword: 86 156 214;
+  --syn-string: 206 145 120;
+  --syn-number: 181 206 168;
+  --syn-comment: 124 166 104;
+  --syn-function: 220 220 170;
+  --syn-variable: 156 220 254;
+  --syn-type: 78 201 176;
+  --syn-property: 156 220 254;
+  --syn-operator: 255 255 255;
+  --syn-namespace: 78 201 176;
+  --syn-meta: 86 156 214;
+  --syn-tag: 86 156 214;
+  --syn-atom: 86 156 214;
+  --syn-link: 33 166 255;
+}
+
+:root[data-theme="solarized"] {
+  color-scheme: light;
+
+  --vs-panel: 238 232 213;
+  --vs-sidebar: 238 232 213;
+  --vs-activity: 238 232 213;
+  --vs-editor: 253 246 227;
+  --vs-status: 38 139 210;
+  --vs-border: 222 216 199;
+  --vs-hover: 232 226 206;
+  --vs-select: 223 217 196;
+  --vs-select-border: 197 191 170;
+  --vs-text: 88 110 117;
+  --vs-strong: 7 54 66;
+  --vs-dim: 131 148 150;
+  --vs-accent: 38 139 210;
+  --vs-green: 133 153 0;
+  --vs-red: 220 50 47;
+  --vs-orange: 203 75 22;
+  --vs-yellow: 181 137 0;
+  --vs-purple: 211 54 130;
+  --vs-blue: 38 139 210;
+  --vs-modified: 181 137 0;
+  --vs-input: 253 246 227;
+  --vs-badge: 226 220 200;
+  --vs-highlight: 238 232 213;
+  --vs-selection: 223 215 190;
+  --vs-selection-text: 7 54 66;
+  --vs-scrollbar: 205 197 175;
+  --vs-scrollbar-hover: 147 161 161;
+
+  --cm-bg: 253 246 227;
+  --cm-fg: 88 110 117;
+  --cm-caret: 7 54 66;
+  --cm-selection: 223 215 190;
+  --cm-selection-match: 233 225 200;
+  --cm-active-line: 245 238 218;
+  --cm-gutter-bg: 253 246 227;
+  --cm-gutter-fg: 147 161 161;
+  --cm-gutter-border: 238 232 213;
+  --cm-active-gutter-bg: 238 232 213;
+  --cm-active-gutter-fg: 7 54 66;
+  --cm-fold-bg: 238 232 213;
+  --cm-fold-border: 222 216 199;
+  --cm-fold-fg: 131 148 150;
+  --cm-tooltip-bg: 253 246 227;
+  --cm-tooltip-border: 222 216 199;
+  --cm-accent-soft: 223 215 190;
+  --cm-bracket-bg: 238 232 213;
+  --cm-bracket-outline: 147 161 161;
+  --cm-panel-bg: 238 232 213;
+  --cm-panel-border: 222 216 199;
+  --cm-search-bg: 238 232 213;
+  --cm-search-outline: 181 137 0;
+  --cm-search-selected: 230 219 178;
+  --cm-invalid: 220 50 47;
+
+  --syn-keyword: 133 153 0;
+  --syn-string: 42 161 152;
+  --syn-number: 211 54 130;
+  --syn-comment: 147 161 161;
+  --syn-function: 181 137 0;
+  --syn-variable: 38 139 210;
+  --syn-type: 203 75 22;
+  --syn-property: 38 139 210;
+  --syn-operator: 88 110 117;
+  --syn-namespace: 203 75 22;
+  --syn-meta: 38 139 210;
+  --syn-tag: 38 139 210;
+  --syn-atom: 211 54 130;
+  --syn-link: 38 139 210;
+}
+
 html,
 body,
 #root {
@@ -9,8 +310,8 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: #f3f3f3;
-  color: #3b3b3b;
+  background: rgb(var(--vs-sidebar));
+  color: rgb(var(--vs-text));
   font-family: "Segoe UI", "Inter", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   user-select: none;
@@ -37,31 +338,31 @@ body,
 }
 
 ::selection {
-  background: #add6ff;
-  color: #1f1f1f;
+  background: rgb(var(--vs-selection));
+  color: rgb(var(--vs-selection-text));
 }
 
-/* Light scrollbars */
+/* Themed scrollbars */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: #f3f3f3;
+  background: rgb(var(--vs-sidebar));
 }
 ::-webkit-scrollbar-thumb {
-  background: #c8c8c8;
-  border: 2px solid #f3f3f3;
+  background: rgb(var(--vs-scrollbar));
+  border: 2px solid rgb(var(--vs-sidebar));
   border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: rgb(var(--vs-scrollbar-hover));
 }
 ::-webkit-scrollbar-corner {
-  background: #f3f3f3;
+  background: rgb(var(--vs-sidebar));
 }
 
-/* CodeMirror shell; colours come from the light theme in CodeEditor.tsx. */
+/* CodeMirror shell; colours come from the CSS variables in CodeEditor.tsx. */
 .cm-editor {
   height: 100%;
   font-family: "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, monospace;

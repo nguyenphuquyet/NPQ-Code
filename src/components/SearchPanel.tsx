@@ -13,7 +13,7 @@ function Highlight({ text, query, caseSensitive }: { text: string; query: string
   return (
     <>
       {text.slice(0, index)}
-      <mark className="rounded-sm bg-[#FFE9A8] text-vs-strong">
+      <mark className="rounded-sm bg-vs-highlight text-vs-strong">
         {text.slice(index, index + query.length)}
       </mark>
       {text.slice(index + query.length)}

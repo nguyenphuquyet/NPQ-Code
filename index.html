@@ -1,12 +1,33 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NPQ Code</title>
+    <script>
+      // Apply the saved theme before the first paint to avoid a light flash.
+      try {
+        var theme = localStorage.getItem("npqcode.theme") || "light";
+        document.documentElement.dataset.theme = theme;
+        if (theme === "dark" || theme === "hc") {
+          document.documentElement.style.colorScheme = "dark";
+        }
+      } catch (error) {
+        /* storage unavailable */
+      }
+    </script>
     <style>
       html {
         background: #f3f3f3;
+      }
+      html[data-theme="dark"] {
+        background: #1e1e1e;
+      }
+      html[data-theme="hc"] {
+        background: #000000;
+      }
+      html[data-theme="solarized"] {
+        background: #eee8d5;
       }
     </style>
   </head>

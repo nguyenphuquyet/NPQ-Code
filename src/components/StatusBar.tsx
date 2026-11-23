@@ -21,7 +21,7 @@ export default function StatusBar() {
     : "";
 
   return (
-    <div className="flex h-6 shrink-0 select-none items-center bg-vs-status px-1 text-2xs text-white">
+    <div className="flex h-6 shrink-0 select-none items-center border-t border-vs-border bg-vs-status px-1 text-2xs text-white">
       <button
         className="flex h-full items-center gap-1 px-2 hover:bg-white/15"
         onClick={() => s.setSidebarView("explorer")}

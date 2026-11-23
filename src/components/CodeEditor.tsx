@@ -30,65 +30,81 @@ import { tags as t } from "@lezer/highlight";
 import { getActiveEditor, setActiveEditor } from "../lib/editorBridge";
 import type { RevealTarget } from "../lib/store";
 
-const lightHighlight = HighlightStyle.define([
-  { tag: [t.keyword, t.controlKeyword, t.moduleKeyword], color: "#0000FF" },
-  { tag: [t.string, t.special(t.string), t.attributeValue], color: "#A31515" },
-  { tag: [t.number, t.bool, t.null], color: "#098658" },
-  { tag: t.comment, color: "#008000", fontStyle: "italic" },
-  { tag: [t.function(t.variableName), t.function(t.propertyName)], color: "#795E26" },
-  { tag: [t.definition(t.variableName), t.variableName], color: "#001080" },
-  { tag: [t.typeName, t.className, t.definition(t.typeName)], color: "#267F99" },
-  { tag: [t.propertyName, t.attributeName], color: "#001080" },
-  { tag: [t.operator, t.punctuation], color: "#1F1F1F" },
-  { tag: [t.self, t.namespace], color: "#7B3FA0" },
-  { tag: t.meta, color: "#0070C1" },
-  { tag: t.tagName, color: "#800000" },
-  { tag: t.atom, color: "#7B3FA0" },
+/*
+ * CodeMirror colours come from the theme CSS variables in `src/index.css`
+ * (`--cm-*` for the editor chrome, `--syn-*` for syntax tokens), so switching
+ * theme repaints open editors without reconfiguring any extension.
+ */
+const highlight = HighlightStyle.define([
+  { tag: [t.keyword, t.controlKeyword, t.moduleKeyword], color: "rgb(var(--syn-keyword))" },
+  { tag: [t.string, t.special(t.string), t.attributeValue], color: "rgb(var(--syn-string))" },
+  { tag: [t.number, t.bool, t.null], color: "rgb(var(--syn-number))" },
+  { tag: t.comment, color: "rgb(var(--syn-comment))", fontStyle: "italic" },
+  { tag: [t.function(t.variableName), t.function(t.propertyName)], color: "rgb(var(--syn-function))" },
+  { tag: [t.definition(t.variableName), t.variableName], color: "rgb(var(--syn-variable))" },
+  { tag: [t.typeName, t.className, t.definition(t.typeName)], color: "rgb(var(--syn-type))" },
+  { tag: [t.propertyName, t.attributeName], color: "rgb(var(--syn-property))" },
+  { tag: [t.operator, t.punctuation], color: "rgb(var(--syn-operator))" },
+  { tag: [t.self, t.namespace], color: "rgb(var(--syn-namespace))" },
+  { tag: t.meta, color: "rgb(var(--syn-meta))" },
+  { tag: t.tagName, color: "rgb(var(--syn-tag))" },
+  { tag: t.atom, color: "rgb(var(--syn-atom))" },
   { tag: t.emphasis, fontStyle: "italic" },
   { tag: t.strong, fontWeight: "bold" },
-  { tag: t.link, color: "#0066B8", textDecoration: "underline" },
-  { tag: t.invalid, color: "#CD3131" },
+  { tag: t.link, color: "rgb(var(--syn-link))", textDecoration: "underline" },
+  { tag: t.invalid, color: "rgb(var(--cm-invalid))" },
 ]);
 
-const lightTheme = EditorView.theme(
+const codeTheme = EditorView.theme(
   {
-    "&": { backgroundColor: "#FFFFFF", color: "#1F1F1F", height: "100%" },
-    ".cm-content": { caretColor: "#000000", padding: "8px 0" },
-    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "#000000" },
+    "&": { backgroundColor: "rgb(var(--cm-bg))", color: "rgb(var(--cm-fg))", height: "100%" },
+    ".cm-content": { caretColor: "rgb(var(--cm-caret))", padding: "8px 0" },
+    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "rgb(var(--cm-caret))" },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
-      backgroundColor: "#ADD6FF",
+      backgroundColor: "rgb(var(--cm-selection))",
     },
-    ".cm-selectionMatch": { backgroundColor: "#C9E4FB" },
-    ".cm-activeLine": { backgroundColor: "#F5F5F5" },
+    ".cm-selectionMatch": { backgroundColor: "rgb(var(--cm-selection-match))" },
+    ".cm-activeLine": { backgroundColor: "rgb(var(--cm-active-line))" },
     ".cm-gutters": {
-      backgroundColor: "#FFFFFF",
-      color: "#6E7681",
+      backgroundColor: "rgb(var(--cm-gutter-bg))",
+      color: "rgb(var(--cm-gutter-fg))",
       border: "none",
-      borderRight: "1px solid #F0F0F0",
+      borderRight: "1px solid rgb(var(--cm-gutter-border))",
     },
-    ".cm-activeLineGutter": { backgroundColor: "#F0F0F0", color: "#1F1F1F" },
+    ".cm-activeLineGutter": {
+      backgroundColor: "rgb(var(--cm-active-gutter-bg))",
+      color: "rgb(var(--cm-active-gutter-fg))",
+    },
     ".cm-foldPlaceholder": {
-      backgroundColor: "#F3F3F3",
-      border: "1px solid #E2E2E2",
-      color: "#6B6B6B",
+      backgroundColor: "rgb(var(--cm-fold-bg))",
+      border: "1px solid rgb(var(--cm-fold-border))",
+      color: "rgb(var(--cm-fold-fg))",
     },
     ".cm-tooltip": {
-      backgroundColor: "#FFFFFF",
-      border: "1px solid #C8C8C8",
-      color: "#1F1F1F",
+      backgroundColor: "rgb(var(--cm-tooltip-bg))",
+      border: "1px solid rgb(var(--cm-tooltip-border))",
+      color: "rgb(var(--cm-fg))",
       boxShadow: "0 2px 8px rgba(0, 0, 0, 0.12)",
     },
     ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {
-      backgroundColor: "#D7E8F8",
-      color: "#1F1F1F",
+      backgroundColor: "rgb(var(--cm-accent-soft))",
+      color: "rgb(var(--cm-fg))",
     },
-    ".cm-matchingBracket": { backgroundColor: "#E5F3FF", outline: "1px solid #7FB4D9" },
-    ".cm-nonmatchingBracket": { color: "#CD3131" },
-    ".cm-panels": { backgroundColor: "#F3F3F3", color: "#1F1F1F" },
-    ".cm-panels.cm-panels-top": { borderBottom: "1px solid #E2E2E2" },
-    ".cm-panels.cm-panels-bottom": { borderTop: "1px solid #E2E2E2" },
-    ".cm-searchMatch": { backgroundColor: "#FFE9A8", outline: "1px solid #E2C45C" },
-    ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "#FFD166" },
+    ".cm-matchingBracket": {
+      backgroundColor: "rgb(var(--cm-bracket-bg))",
+      outline: "1px solid rgb(var(--cm-bracket-outline))",
+    },
+    ".cm-nonmatchingBracket": { color: "rgb(var(--cm-invalid))" },
+    ".cm-panels": { backgroundColor: "rgb(var(--cm-panel-bg))", color: "rgb(var(--cm-fg))" },
+    ".cm-panels.cm-panels-top": { borderBottom: "1px solid rgb(var(--cm-panel-border))" },
+    ".cm-panels.cm-panels-bottom": { borderTop: "1px solid rgb(var(--cm-panel-border))" },
+    ".cm-searchMatch": {
+      backgroundColor: "rgb(var(--cm-search-bg))",
+      outline: "1px solid rgb(var(--cm-search-outline))",
+    },
+    ".cm-searchMatch.cm-searchMatch-selected": {
+      backgroundColor: "rgb(var(--cm-search-selected))",
+    },
   },
   { dark: false },
 );
@@ -181,8 +197,8 @@ export default function CodeEditor({
           indentWithTab,
         ]),
         saveKeymap,
-        syntaxHighlighting(lightHighlight, { fallback: false }),
-        lightTheme,
+        syntaxHighlighting(highlight, { fallback: false }),
+        codeTheme,
         languageFor(language),
         updateListener,
         EditorView.lineWrapping,

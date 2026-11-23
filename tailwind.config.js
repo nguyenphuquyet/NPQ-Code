@@ -4,30 +4,36 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Flat light palette modelled on VS Code's Light+ theme.
+        /*
+         * Every UI colour is a CSS variable (`src/index.css` defines one block per
+         * theme), so switching a theme needs no re-render of the components.
+         * Variables hold `R G B` triples, which keeps Tailwind opacity modifiers
+         * such as `bg-vs-accent/40` working.
+         */
         vs: {
-          panel: "#F8F8F8",
-          sidebar: "#F3F3F3",
-          activity: "#F8F8F8",
-          editor: "#FFFFFF",
-          status: "#007ACC",
-          border: "#E2E2E2",
-          hover: "#E8E8E8",
-          select: "#D7E8F8",
-          selectBorder: "#BBD9F2",
-          text: "#3B3B3B",
-          strong: "#1F1F1F",
-          dim: "#6B6B6B",
-          accent: "#0066B8",
-          green: "#16825D",
-          red: "#CD3131",
-          orange: "#B06A00",
-          yellow: "#9A7A00",
-          purple: "#7B3FA0",
-          blue: "#1A6FB5",
-          modified: "#0066B8",
-          input: "#FFFFFF",
-          badge: "#E1E1E1",
+          panel: "rgb(var(--vs-panel) / <alpha-value>)",
+          sidebar: "rgb(var(--vs-sidebar) / <alpha-value>)",
+          activity: "rgb(var(--vs-activity) / <alpha-value>)",
+          editor: "rgb(var(--vs-editor) / <alpha-value>)",
+          status: "rgb(var(--vs-status) / <alpha-value>)",
+          border: "rgb(var(--vs-border) / <alpha-value>)",
+          hover: "rgb(var(--vs-hover) / <alpha-value>)",
+          select: "rgb(var(--vs-select) / <alpha-value>)",
+          selectBorder: "rgb(var(--vs-select-border) / <alpha-value>)",
+          text: "rgb(var(--vs-text) / <alpha-value>)",
+          strong: "rgb(var(--vs-strong) / <alpha-value>)",
+          dim: "rgb(var(--vs-dim) / <alpha-value>)",
+          accent: "rgb(var(--vs-accent) / <alpha-value>)",
+          green: "rgb(var(--vs-green) / <alpha-value>)",
+          red: "rgb(var(--vs-red) / <alpha-value>)",
+          orange: "rgb(var(--vs-orange) / <alpha-value>)",
+          yellow: "rgb(var(--vs-yellow) / <alpha-value>)",
+          purple: "rgb(var(--vs-purple) / <alpha-value>)",
+          blue: "rgb(var(--vs-blue) / <alpha-value>)",
+          modified: "rgb(var(--vs-modified) / <alpha-value>)",
+          input: "rgb(var(--vs-input) / <alpha-value>)",
+          badge: "rgb(var(--vs-badge) / <alpha-value>)",
+          highlight: "rgb(var(--vs-highlight) / <alpha-value>)",
         },
       },
       fontFamily: {

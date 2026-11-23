@@ -12,7 +12,7 @@ Backend: **Tauri v2** (Rust).
 - **Tìm kiếm toàn workspace**: panel Search (`Ctrl+Shift+F`), kết quả theo tệp, bấm để nhảy đúng dòng/cột.
 - **Quick Open**: `Ctrl+P` để mở nhanh tệp theo tên.
 - **Terminal tích hợp**: chạy lệnh shell ngay trong workspace, log stream theo thời gian thực, dừng lệnh đang chạy.
-- **Giao diện sáng đồng bộ**: một bảng màu phẳng, không gradient; thanh trạng thái kiểu VS Code.
+- **Giao diện & chủ đề**: thanh trạng thái kiểu VS Code, bảng màu phẳng không gradient; 4 chủ đề **Light+** (mặc định), **Dark+**, **High Contrast**, **Solarized Light** — đổi trong **Cài đặt**, áp dụng ngay và được ghi nhớ.
 - **Đa ngôn ngữ**: Tiếng Việt, English, 中文 — đổi ngay trong **Cài đặt** (biểu tượng bánh răng ở thanh bên hoặc menu **Trợ giúp → Cài đặt**), lựa chọn được ghi nhớ.
 - **Recent folders**: mở lại workspace gần đây từ màn hình Welcome.
 - **Zoom giao diện**: `Ctrl+=`, `Ctrl+-`, `Ctrl+0`.

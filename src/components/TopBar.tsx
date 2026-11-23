@@ -4,8 +4,6 @@ import {
   Copy,
   Eraser,
   FolderOpen,
-  Maximize2,
-  Minus,
   MinusSquare,
   Redo2,
   Save,
@@ -290,29 +288,53 @@ export default function TopBar() {
         </button>
       </div>
 
-      <div className="no-drag flex items-center gap-0.5 pr-1">
+      <div className="no-drag flex items-stretch">
         <button
           onClick={() => winAction("minimize")}
           title={t("window.minimize")}
-          className="grid h-7 w-10 place-items-center rounded-sm text-vs-text hover:bg-vs-hover"
+          className="grid h-full w-11 place-items-center text-vs-text hover:bg-vs-hover"
         >
-          <Minus size={13} />
+          <CaptionGlyph kind="minimize" />
         </button>
         <button
           onClick={() => winAction("toggleMaximize")}
           title={t("window.maximize")}
-          className="grid h-7 w-10 place-items-center rounded-sm text-vs-text hover:bg-vs-hover"
+          className="grid h-full w-11 place-items-center text-vs-text hover:bg-vs-hover"
         >
-          <Maximize2 size={12} />
+          <CaptionGlyph kind="maximize" />
         </button>
         <button
           onClick={() => winAction("close")}
           title={t("window.close")}
-          className="grid h-7 w-10 place-items-center rounded-sm text-vs-text hover:bg-[#E81123] hover:text-white"
+          className="grid h-full w-11 place-items-center text-vs-text hover:bg-[#E81123] hover:text-white"
         >
-          <X size={14} />
+          <CaptionGlyph kind="close" />
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Windows-style caption glyphs drawn on a 10×10 grid with 1px strokes. Lucide's
+ * icons are designed for UI actions (its "maximize" is a diagonal expand arrow),
+ * which reads oddly in a real title bar.
+ */
+function CaptionGlyph({ kind }: { kind: "minimize" | "maximize" | "close" }) {
+  return (
+    <svg
+      width="10"
+      height="10"
+      viewBox="0 0 10 10"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {kind === "minimize" && <path d="M0 5.5h10" />}
+      {kind === "maximize" && <rect x="0.5" y="0.5" width="9" height="9" />}
+      {kind === "close" && <path d="M0.5 0.5l9 9M9.5 0.5l-9 9" />}
+    </svg>
   );
 }
