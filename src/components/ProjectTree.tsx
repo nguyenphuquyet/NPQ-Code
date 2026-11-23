@@ -18,6 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useStudio } from "../lib/store";
+import { useI18n } from "../lib/i18n";
 import type { FileNode } from "../lib/api";
 import { useContextMenu } from "./ContextMenu";
 import { copyText } from "../lib/clipboard";
@@ -50,6 +51,7 @@ type TreeProps = {
 
 function TreeNode({ node, depth, expanded, toggle }: TreeProps) {
   const s = useStudio();
+  const { t } = useI18n();
   const ctx = useContextMenu();
   const isActive = s.activePath === node.path;
   const open = expanded.has(node.path);
@@ -59,53 +61,53 @@ function TreeNode({ node, depth, expanded, toggle }: TreeProps) {
     const items = node.is_dir
       ? [
           {
-            label: "New File",
+            label: t("explorer.newFile"),
             icon: <FilePlus2 size={12} />,
             action: () => {
-              const name = window.prompt("New file name:");
+              const name = window.prompt(t("tree.newFileName"));
               if (name) void s.newFile(node.path, name);
             },
           },
           {
-            label: "New Folder",
+            label: t("explorer.newFolder"),
             icon: <FolderPlus size={12} />,
             action: () => {
-              const name = window.prompt("New folder name:");
+              const name = window.prompt(t("tree.newFolderName"));
               if (name) void s.newFolder(node.path, name);
             },
           },
           { separator: true as const },
         ]
       : [
-          { label: "Open", icon: <FileCode2 size={12} />, action: () => void s.openFile(node.path) },
+          { label: t("tree.open"), icon: <FileCode2 size={12} />, action: () => void s.openFile(node.path) },
           { separator: true as const },
         ];
 
     ctx.open(event, [
       ...items,
       {
-        label: "Rename",
+        label: t("tree.rename"),
         icon: <Pencil size={12} />,
         action: () => {
-          const name = window.prompt("New name:", node.name);
+          const name = window.prompt(t("tree.renameName"), node.name);
           if (name && name !== node.name) {
             void s.renamePath(node.path, parentDir(node.path) + "/" + name);
           }
         },
       },
-      { label: "Copy Path", icon: <ClipboardCopy size={12} />, action: () => void copyText(node.path) },
+      { label: t("tree.copyPath"), icon: <ClipboardCopy size={12} />, action: () => void copyText(node.path) },
       {
-        label: "Refresh",
+        label: t("tree.refresh"),
         icon: <RefreshCw size={12} />,
         action: () => s.refreshTree(),
       },
       { separator: true },
       {
-        label: "Delete",
+        label: t("tree.delete"),
         icon: <Trash2 size={12} />,
         danger: true,
         action: () => {
-          if (window.confirm(`Delete ${node.name}?`)) void s.deleteFile(node.path);
+          if (window.confirm(t("tree.deleteConfirm", { name: node.name }))) void s.deleteFile(node.path);
         },
       },
     ]);
@@ -170,6 +172,7 @@ function TreeNode({ node, depth, expanded, toggle }: TreeProps) {
 
 export default function ProjectTree() {
   const s = useStudio();
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // A new folder starts collapsed, like a fresh Explorer.
@@ -188,7 +191,9 @@ export default function ProjectTree() {
 
   const createAtRoot = async (kind: "file" | "folder") => {
     if (!s.workspace) return;
-    const name = window.prompt(kind === "file" ? "New file name:" : "New folder name:");
+    const name = window.prompt(
+      kind === "file" ? t("tree.newFileName") : t("tree.newFolderName"),
+    );
     if (!name) return;
     if (kind === "file") await s.newFile(s.workspace.path, name);
     else await s.newFolder(s.workspace.path, name);
@@ -198,15 +203,15 @@ export default function ProjectTree() {
     return (
       <div className="flex h-full flex-col bg-vs-sidebar">
         <div className="flex h-7 shrink-0 items-center px-3 text-2xs font-semibold uppercase tracking-wide text-vs-dim">
-          Explorer
+          {t("explorer.title")}
         </div>
         <div className="px-4 py-6 text-2xs text-vs-dim">
-          <p>You have not opened a folder yet.</p>
+          <p>{t("explorer.noFolder")}</p>
           <button
             onClick={() => s.setDialog("open")}
             className="mt-3 rounded bg-vs-accent px-3 py-1.5 text-white hover:opacity-90"
           >
-            Open Folder
+            {t("explorer.openFolder")}
           </button>
         </div>
       </div>
@@ -216,31 +221,31 @@ export default function ProjectTree() {
   return (
     <div className="flex h-full flex-col bg-vs-sidebar">
       <div className="flex h-7 shrink-0 items-center gap-1 px-2 text-2xs font-semibold uppercase tracking-wide text-vs-dim">
-        <span className="flex-1">Explorer</span>
+        <span className="flex-1">{t("explorer.title")}</span>
         <button
           className="grid h-5 w-5 place-items-center rounded hover:bg-vs-hover"
-          title="New File"
+          title={t("explorer.newFile")}
           onClick={() => void createAtRoot("file")}
         >
           <FilePlus2 size={13} />
         </button>
         <button
           className="grid h-5 w-5 place-items-center rounded hover:bg-vs-hover"
-          title="New Folder"
+          title={t("explorer.newFolder")}
           onClick={() => void createAtRoot("folder")}
         >
           <FolderPlus size={13} />
         </button>
         <button
           className="grid h-5 w-5 place-items-center rounded hover:bg-vs-hover"
-          title="Refresh"
+          title={t("explorer.refresh")}
           onClick={() => s.refreshTree()}
         >
           <RefreshCw size={12} />
         </button>
         <button
           className="grid h-5 w-5 place-items-center rounded hover:bg-vs-hover"
-          title="Collapse All"
+          title={t("explorer.collapseAll")}
           onClick={() => setExpanded(new Set())}
         >
           <ChevronRight size={12} />
@@ -256,7 +261,7 @@ export default function ProjectTree() {
           <TreeNode key={child.path} node={child} depth={0} expanded={expanded} toggle={toggle} />
         ))}
         {s.tree && s.tree.children.length === 0 && (
-          <div className="px-3 py-2 text-2xs text-vs-dim">This folder is empty.</div>
+          <div className="px-3 py-2 text-2xs text-vs-dim">{t("explorer.empty")}</div>
         )}
       </div>
     </div>

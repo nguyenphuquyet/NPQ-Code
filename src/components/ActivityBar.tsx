@@ -1,16 +1,18 @@
 import { Blocks, Files, GitBranch, Info, Search, Settings } from "lucide-react";
 import { useStudio } from "../lib/store";
+import { useI18n, type TranslationKey } from "../lib/i18n";
 import type { SidebarView } from "../lib/store";
 
-const VIEWS: { id: SidebarView; label: string; icon: typeof Files }[] = [
-  { id: "explorer", label: "Explorer", icon: Files },
-  { id: "search", label: "Search", icon: Search },
-  { id: "git", label: "Source Control", icon: GitBranch },
-  { id: "extensions", label: "Extensions", icon: Blocks },
+const VIEWS: { id: SidebarView; key: TranslationKey; icon: typeof Files }[] = [
+  { id: "explorer", key: "activity.explorer", icon: Files },
+  { id: "search", key: "activity.search", icon: Search },
+  { id: "git", key: "activity.sourceControl", icon: GitBranch },
+  { id: "extensions", key: "activity.extensions", icon: Blocks },
 ];
 
 export default function ActivityBar() {
   const s = useStudio();
+  const { t } = useI18n();
 
   const select = (view: SidebarView) => {
     if (s.sidebarVisible && s.sidebarView === view) {
@@ -28,7 +30,7 @@ export default function ActivityBar() {
         return (
           <button
             key={view.id}
-            title={view.label}
+            title={t(view.key)}
             onClick={() => select(view.id)}
             className={`relative mb-1 grid h-9 w-full place-items-center ${
               active ? "text-vs-strong" : "text-vs-dim hover:text-vs-strong"
@@ -41,17 +43,15 @@ export default function ActivityBar() {
       })}
       <div className="flex-1" />
       <button
-        title="Info"
-        onClick={() =>
-          s.showToast("NPQ Code — open a folder, edit, and run commands in the terminal")
-        }
+        title={t("activity.info")}
+        onClick={() => s.showToast(t("activity.infoMessage"))}
         className="mb-1 grid h-9 w-full place-items-center text-vs-dim hover:text-vs-strong"
       >
         <Info size={18} />
       </button>
       <button
-        title="Settings"
-        onClick={() => s.showToast("Settings live in your project files and the Status Bar")}
+        title={t("activity.settings")}
+        onClick={() => s.setSettingsOpen(true)}
         className="mb-1 grid h-9 w-full place-items-center text-vs-dim hover:text-vs-strong"
       >
         <Settings size={18} />

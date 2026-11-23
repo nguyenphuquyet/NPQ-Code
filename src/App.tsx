@@ -9,6 +9,7 @@ import BottomPanel from "./components/BottomPanel";
 import StatusBar from "./components/StatusBar";
 import WelcomeScreen from "./components/WelcomeScreen";
 import QuickOpen from "./components/QuickOpen";
+import SettingsDialog from "./components/SettingsDialog";
 
 export default function App() {
   const s = useStudio();
@@ -94,6 +95,7 @@ export default function App() {
 
       <StatusBar />
       <QuickOpen />
+      <SettingsDialog />
       {s.toast && <Toast message={s.toast} />}
     </div>
   );

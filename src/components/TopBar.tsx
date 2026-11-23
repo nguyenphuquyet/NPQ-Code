@@ -20,6 +20,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { useStudio } from "../lib/store";
+import { useI18n, type TranslationKey } from "../lib/i18n";
 import { isInteractive, warmWindow, winAction } from "../lib/window";
 import {
   editorCopy,
@@ -45,6 +46,7 @@ const MENU_NAMES = ["File", "Edit", "Selection", "View", "Go", "Terminal", "Help
 
 export default function TopBar() {
   const s = useStudio();
+  const { t } = useI18n();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menusRef = useRef<HTMLDivElement>(null);
 
@@ -104,26 +106,27 @@ export default function TopBar() {
       case "zoomIn": s.zoomIn(); break;
       case "zoomOut": s.zoomOut(); break;
       case "zoomReset": s.resetZoom(); break;
-      case "about": s.showToast("NPQ Code 1.0 — a lightweight Tauri code editor"); break;
+      case "settings": s.setSettingsOpen(true); break;
+      case "about": s.showToast(t("msg.about")); break;
       case "shortcuts":
-        s.showToast("Ctrl+P quick open · Ctrl+Shift+F search · Ctrl+` terminal");
+        s.showToast(t("msg.shortcuts"));
         break;
     }
   };
 
   const menus: Record<(typeof MENU_NAMES)[number], MenuItem[]> = {
     File: [
-      { label: "Open Folder…", icon: <FolderOpen size={13} />, shortcut: "Ctrl+O", action: "openFolder" },
+      { label: t("menu.openFolder"), icon: <FolderOpen size={13} />, shortcut: "Ctrl+O", action: "openFolder" },
       { separator: true },
       {
-        label: "Save",
+        label: t("menu.save"),
         icon: <Save size={13} />,
         shortcut: "Ctrl+S",
         action: "save",
         disabled: !activeFile?.dirty,
       },
       {
-        label: "Save All",
+        label: t("menu.saveAll"),
         icon: <SaveAll size={13} />,
         shortcut: "Ctrl+Shift+S",
         action: "saveAll",
@@ -131,51 +134,51 @@ export default function TopBar() {
       },
       { separator: true },
       {
-        label: "Close Editor",
+        label: t("menu.closeEditor"),
         icon: <X size={13} />,
         shortcut: "Ctrl+W",
         action: "closeEditor",
         disabled: !activeFile,
       },
       {
-        label: "Close Folder",
+        label: t("menu.closeFolder"),
         icon: <FolderOpen size={13} />,
         action: "closeFolder",
         disabled: !s.workspace,
       },
       { separator: true },
-      { label: "Exit", icon: <MinusSquare size={13} />, action: "exit" },
+      { label: t("menu.exit"), icon: <MinusSquare size={13} />, action: "exit" },
     ],
     Edit: [
-      { label: "Undo", icon: <Undo2 size={13} />, shortcut: "Ctrl+Z", action: "undo", disabled: !activeFile },
-      { label: "Redo", icon: <Redo2 size={13} />, shortcut: "Ctrl+Y", action: "redo", disabled: !activeFile },
+      { label: t("menu.undo"), icon: <Undo2 size={13} />, shortcut: "Ctrl+Z", action: "undo", disabled: !activeFile },
+      { label: t("menu.redo"), icon: <Redo2 size={13} />, shortcut: "Ctrl+Y", action: "redo", disabled: !activeFile },
       { separator: true },
-      { label: "Cut", icon: <Scissors size={13} />, shortcut: "Ctrl+X", action: "cut", disabled: !activeFile },
-      { label: "Copy", icon: <Copy size={13} />, shortcut: "Ctrl+C", action: "copy", disabled: !activeFile },
-      { label: "Paste", icon: <Copy size={13} />, shortcut: "Ctrl+V", action: "paste", disabled: !activeFile },
+      { label: t("menu.cut"), icon: <Scissors size={13} />, shortcut: "Ctrl+X", action: "cut", disabled: !activeFile },
+      { label: t("menu.copy"), icon: <Copy size={13} />, shortcut: "Ctrl+C", action: "copy", disabled: !activeFile },
+      { label: t("menu.paste"), icon: <Copy size={13} />, shortcut: "Ctrl+V", action: "paste", disabled: !activeFile },
       { separator: true },
-      { label: "Find", shortcut: "Ctrl+F", action: "find", disabled: !activeFile },
+      { label: t("menu.find"), shortcut: "Ctrl+F", action: "find", disabled: !activeFile },
     ],
     Selection: [
-      { label: "Select All", shortcut: "Ctrl+A", action: "selectAll", disabled: !activeFile },
+      { label: t("menu.selectAll"), shortcut: "Ctrl+A", action: "selectAll", disabled: !activeFile },
     ],
     View: [
-      { label: "Explorer", shortcut: "Ctrl+Shift+E", action: "explorer" },
-      { label: "Search", shortcut: "Ctrl+Shift+F", action: "search" },
-      { label: "Problems", shortcut: "Ctrl+Shift+M", action: "problems" },
-      { label: "Output", shortcut: "Ctrl+Shift+U", action: "output" },
-      { label: "Terminal", shortcut: "Ctrl+`", action: "terminal" },
+      { label: t("menu.explorer"), shortcut: "Ctrl+Shift+E", action: "explorer" },
+      { label: t("menu.search"), shortcut: "Ctrl+Shift+F", action: "search" },
+      { label: t("menu.problems"), shortcut: "Ctrl+Shift+M", action: "problems" },
+      { label: t("menu.output"), shortcut: "Ctrl+Shift+U", action: "output" },
+      { label: t("menu.terminal"), shortcut: "Ctrl+`", action: "terminal" },
       { separator: true },
-      { label: "Toggle Side Bar", shortcut: "Ctrl+B", action: "toggleSidebar" },
-      { label: "Toggle Terminal", shortcut: "Ctrl+`", action: "toggleTerminal" },
+      { label: t("menu.toggleSideBar"), shortcut: "Ctrl+B", action: "toggleSidebar" },
+      { label: t("menu.toggleTerminal"), shortcut: "Ctrl+`", action: "toggleTerminal" },
       { separator: true },
-      { label: "Zoom In", icon: <ZoomIn size={13} />, shortcut: "Ctrl+=", action: "zoomIn" },
-      { label: "Zoom Out", icon: <ZoomOut size={13} />, shortcut: "Ctrl+-", action: "zoomOut" },
-      { label: "Reset Zoom", shortcut: "Ctrl+0", action: "zoomReset" },
+      { label: t("menu.zoomIn"), icon: <ZoomIn size={13} />, shortcut: "Ctrl+=", action: "zoomIn" },
+      { label: t("menu.zoomOut"), icon: <ZoomOut size={13} />, shortcut: "Ctrl+-", action: "zoomOut" },
+      { label: t("menu.zoomReset"), shortcut: "Ctrl+0", action: "zoomReset" },
     ],
     Go: [
       {
-        label: "Go to File…",
+        label: t("menu.goToFile"),
         icon: <Search size={13} />,
         shortcut: "Ctrl+P",
         action: "quickOpen",
@@ -184,28 +187,32 @@ export default function TopBar() {
     ],
     Terminal: [
       {
-        label: s.bottomVisible && s.bottomTab === "terminal" ? "Hide Terminal" : "Show Terminal",
+        label:
+          s.bottomVisible && s.bottomTab === "terminal"
+            ? t("menu.hideTerminal")
+            : t("menu.showTerminal"),
         icon: <TerminalSquare size={13} />,
         shortcut: "Ctrl+`",
         action: "toggleTerminal",
         disabled: !s.workspace,
       },
       {
-        label: "Clear Terminal",
+        label: t("menu.clearTerminal"),
         icon: <Eraser size={13} />,
         action: "clearTerminal",
       },
       {
-        label: "Stop Running Command",
+        label: t("menu.stopCommand"),
         icon: <Square size={11} />,
         action: "stopCommand",
         disabled: s.terminalRunning === null,
       },
     ],
     Help: [
-      { label: "Keyboard Shortcuts", action: "shortcuts" },
+      { label: t("menu.shortcuts"), action: "shortcuts" },
+      { label: t("menu.settings"), action: "settings" },
       { separator: true },
-      { label: "About NPQ Code", icon: <Code2 size={13} />, action: "about" },
+      { label: t("menu.about"), icon: <Code2 size={13} />, action: "about" },
     ],
   };
 
@@ -241,7 +248,7 @@ export default function TopBar() {
               onMouseEnter={() => openMenu && setOpenMenu(name)}
               onClick={() => setOpenMenu(openMenu === name ? null : name)}
             >
-              {name}
+              {t(`menu.${name.toLowerCase()}` as TranslationKey)}
             </button>
             {openMenu === name && (
               <div className="absolute left-0 top-full z-50 min-w-[240px] rounded-b border border-vs-border bg-vs-editor py-1 text-vs-text shadow-lg">
@@ -273,11 +280,11 @@ export default function TopBar() {
         <button
           onClick={() => (s.workspace ? s.setQuickOpen(true) : s.setDialog("open"))}
           className="no-drag flex h-6 w-full max-w-[520px] items-center gap-2 rounded border border-vs-border bg-vs-editor px-2.5 text-vs-dim hover:border-vs-accent/60 hover:text-vs-text"
-          title={s.workspace ? "Search files (Ctrl+P)" : "Open Folder (Ctrl+O)"}
+          title={s.workspace ? t("topbar.searchFiles") : t("topbar.openFolder")}
         >
           <Search size={12} />
           <span className="min-w-0 flex-1 truncate text-center">
-            {activeFile ? activeFile.name : s.workspace ? s.workspace.name : "Open a folder to start"}
+            {activeFile ? activeFile.name : s.workspace ? s.workspace.name : t("topbar.openToStart")}
           </span>
           <kbd className="rounded bg-vs-sidebar px-1 text-[0.625rem] text-vs-dim">Ctrl+P</kbd>
         </button>
@@ -286,21 +293,21 @@ export default function TopBar() {
       <div className="no-drag flex items-center gap-0.5 pr-1">
         <button
           onClick={() => winAction("minimize")}
-          title="Minimize"
+          title={t("window.minimize")}
           className="grid h-7 w-10 place-items-center rounded-sm text-vs-text hover:bg-vs-hover"
         >
           <Minus size={13} />
         </button>
         <button
           onClick={() => winAction("toggleMaximize")}
-          title="Maximize / Restore"
+          title={t("window.maximize")}
           className="grid h-7 w-10 place-items-center rounded-sm text-vs-text hover:bg-vs-hover"
         >
           <Maximize2 size={12} />
         </button>
         <button
           onClick={() => winAction("close")}
-          title="Close"
+          title={t("window.close")}
           className="grid h-7 w-10 place-items-center rounded-sm text-vs-text hover:bg-[#E81123] hover:text-white"
         >
           <X size={14} />

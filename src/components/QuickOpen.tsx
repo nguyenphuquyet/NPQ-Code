@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { FileCode2, Search } from "lucide-react";
 import { useStudio } from "../lib/store";
+import { useI18n } from "../lib/i18n";
 import { flattenFiles } from "../lib/api";
 
 export default function QuickOpen() {
   const s = useStudio();
+  const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
@@ -83,7 +85,7 @@ export default function QuickOpen() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search files by name"
+            placeholder={t("quickOpen.placeholder")}
             className="min-w-0 flex-1 bg-transparent text-xs text-vs-strong outline-none placeholder:text-vs-dim"
           />
           <kbd className="rounded bg-vs-sidebar px-1.5 py-0.5 text-[0.625rem] text-vs-dim">Esc</kbd>
@@ -91,7 +93,7 @@ export default function QuickOpen() {
 
         <div ref={listRef} className="max-h-[46vh] overflow-auto py-1">
           {matches.length === 0 && (
-            <div className="px-3 py-3 text-2xs text-vs-dim">No matching files.</div>
+            <div className="px-3 py-3 text-2xs text-vs-dim">{t("quickOpen.noMatches")}</div>
           )}
           {matches.map((file, index) => {
             const directory =
@@ -115,9 +117,13 @@ export default function QuickOpen() {
         </div>
 
         <div className="flex items-center gap-3 border-t border-vs-border px-3 py-1 text-[0.625rem] text-vs-dim">
-          <span>Enter to open</span>
-          <span>↑↓ to navigate</span>
-          <span className="ml-auto">{matches.length} files</span>
+          <span>{t("quickOpen.enterToOpen")}</span>
+          <span>{t("quickOpen.navigate")}</span>
+          <span className="ml-auto">
+            {matches.length === 1
+              ? t("quickOpen.filesOne")
+              : t("quickOpen.filesMany", { count: matches.length })}
+          </span>
         </div>
       </div>
     </div>

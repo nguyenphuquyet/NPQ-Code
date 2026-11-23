@@ -18,6 +18,7 @@ import {
   type SearchFile,
   type WorkspaceInfo,
 } from "./api";
+import { useI18n } from "./i18n";
 
 export type OpenFile = {
   path: string;
@@ -93,6 +94,7 @@ type StudioState = {
   dialog: null | "open";
   toast: string | null;
   uiScale: number;
+  settingsOpen: boolean;
 
   loadRecent: () => void;
   openWorkspace: (path: string) => Promise<void>;
@@ -126,6 +128,7 @@ type StudioState = {
   setQuickOpen: (open: boolean) => void;
   setCursor: (line: number, col: number) => void;
   setDialog: (dialog: null | "open") => void;
+  setSettingsOpen: (open: boolean) => void;
   showToast: (message: string) => void;
   setUiScale: (scale: number) => void;
   zoomIn: () => void;
@@ -143,6 +146,7 @@ export function useStudio(): StudioState {
 }
 
 export function StudioProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
   const [tree, setTree] = useState<FileNode | null>(null);
   const [recent, setRecent] = useState<RecentWorkspace[]>([]);
@@ -167,6 +171,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const [quickOpen, setQuickOpen] = useState(false);
   const [cursor, setCursor] = useState({ line: 1, col: 1 });
   const [dialog, setDialog] = useState<null | "open">(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [uiScale, setUiScale] = useState(readStoredScale);
   const toastTimer = useRef<number | null>(null);
@@ -241,7 +246,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         ...prev.slice(-2000),
         {
           stream: done.success ? "system" : "error",
-          line: `Process exited with code ${done.code}`,
+          line: t("terminal.exited", { code: done.code }),
         },
       ]);
     }).then((unlisten) => {
@@ -253,7 +258,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       unOutput?.();
       unDone?.();
     };
-  }, [loadRecent]);
+  }, [loadRecent, t]);
 
   const refreshTree = useCallback(() => {
     if (!workspace) return;
@@ -307,15 +312,15 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         const nextTree = await api.listTree(info.path);
         setTree(nextTree);
         loadRecent();
-        appendOutput(`Opened folder ${info.path}`);
-        showToast(`Opened ${info.name}`);
+        appendOutput(t("msg.workspaceOpened", { path: info.path }));
+        showToast(t("msg.opened", { name: info.name }));
         setSidebarView("explorer");
         setSidebarVisible(true);
       } catch (error) {
         showToast(String(error));
       }
     },
-    [appendOutput, loadRecent, showToast],
+    [appendOutput, loadRecent, showToast, t],
   );
 
   const closeWorkspace = useCallback(() => {
@@ -388,14 +393,14 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         setOpenFiles((prev) =>
           prev.map((item) => (item.path === path ? { ...item, dirty: false } : item)),
         );
-        appendOutput(`Saved ${file.name}`);
-        showToast(`Saved ${file.name}`);
+        appendOutput(t("msg.saved", { name: file.name }));
+        showToast(t("msg.saved", { name: file.name }));
       } catch (error) {
         appendOutput(String(error), "error");
         showToast(String(error));
       }
     },
-    [appendOutput, openFiles, showToast],
+    [appendOutput, openFiles, showToast, t],
   );
 
   const saveAll = useCallback(async () => {
@@ -404,18 +409,18 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     try {
       for (const file of dirtyFiles) await api.writeFile(file.path, file.content);
       setOpenFiles((prev) => prev.map((file) => ({ ...file, dirty: false })));
-      appendOutput(`Saved ${dirtyFiles.length} file${dirtyFiles.length === 1 ? "" : "s"}`);
-      showToast("All changes saved");
+      appendOutput(t("msg.savedCount", { count: dirtyFiles.length }));
+      showToast(t("msg.savedAll"));
     } catch (error) {
       appendOutput(String(error), "error");
       showToast(String(error));
     }
-  }, [appendOutput, openFiles, showToast]);
+  }, [appendOutput, openFiles, showToast, t]);
 
   const runCommand = useCallback(
     async (command: string) => {
       if (!workspace) {
-        showToast("Open a folder first");
+        showToast(t("msg.openFolderFirst"));
         return;
       }
       const trimmed = command.trim();
@@ -433,7 +438,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         showToast(String(error));
       }
     },
-    [showToast, workspace],
+    [showToast, t, workspace],
   );
 
   const stopCommand = useCallback(async () => {
@@ -492,12 +497,12 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
             : current,
         );
         refreshTree();
-        appendOutput(`Deleted ${path}`);
+        appendOutput(t("msg.deleted", { path }));
       } catch (error) {
         showToast(String(error));
       }
     },
-    [appendOutput, refreshTree, showToast],
+    [appendOutput, refreshTree, showToast, t],
   );
 
   const newFile = useCallback(
@@ -546,12 +551,14 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         );
         setActivePath((current) => (current ? remap(current) : current));
         refreshTree();
-        appendOutput(`Renamed ${fileName(oldPath)} to ${fileName(newPath)}`);
+        appendOutput(
+          t("msg.renamed", { from: fileName(oldPath), to: fileName(newPath) }),
+        );
       } catch (error) {
         showToast(String(error));
       }
     },
-    [appendOutput, refreshTree, showToast],
+    [appendOutput, refreshTree, showToast, t],
   );
 
   const setBottomTabAndShow = useCallback((tab: BottomTab) => {
@@ -641,6 +648,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     dialog,
     toast,
     uiScale,
+    settingsOpen,
     loadRecent,
     openWorkspace,
     closeWorkspace,
@@ -676,6 +684,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     setQuickOpen,
     setCursor: (line: number, col: number) => setCursor({ line, col }),
     setDialog,
+    setSettingsOpen,
     showToast,
     setUiScale: (scale: number) => setUiScale(clampScale(scale)),
     zoomIn,

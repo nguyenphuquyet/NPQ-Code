@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CaseSensitive, Loader2, RefreshCw, Search, X } from "lucide-react";
 import { useStudio } from "../lib/store";
+import { useI18n } from "../lib/i18n";
 import { relativePath } from "../lib/api";
 
 function Highlight({ text, query, caseSensitive }: { text: string; query: string; caseSensitive: boolean }) {
@@ -22,6 +23,7 @@ function Highlight({ text, query, caseSensitive }: { text: string; query: string
 
 export default function SearchPanel() {
   const s = useStudio();
+  const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
@@ -53,10 +55,10 @@ export default function SearchPanel() {
   return (
     <div className="flex h-full flex-col bg-vs-sidebar">
       <div className="flex h-7 shrink-0 items-center gap-1 px-2 text-2xs font-semibold uppercase tracking-wide text-vs-dim">
-        <span className="flex-1">Search</span>
+        <span className="flex-1">{t("search.title")}</span>
         <button
           className="grid h-5 w-5 place-items-center rounded hover:bg-vs-hover"
-          title="Refresh results"
+          title={t("search.refresh")}
           onClick={() => void s.searchWorkspace(query, caseSensitive)}
         >
           <RefreshCw size={12} />
@@ -70,14 +72,16 @@ export default function SearchPanel() {
             ref={inputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={s.workspace ? "Search in folder" : "Open a folder to search"}
+            placeholder={
+              s.workspace ? t("search.placeholder") : t("search.placeholderDisabled")
+            }
             disabled={!s.workspace}
             className="min-w-0 flex-1 bg-transparent text-2xs text-vs-text outline-none placeholder:text-vs-dim disabled:opacity-60"
           />
           {query && (
             <button
               className="grid h-4 w-4 place-items-center rounded text-vs-dim hover:bg-vs-hover"
-              title="Clear"
+              title={t("search.clear")}
               onClick={() => {
                 setQuery("");
                 inputRef.current?.focus();
@@ -90,7 +94,7 @@ export default function SearchPanel() {
             className={`grid h-4 w-4 place-items-center rounded ${
               caseSensitive ? "bg-vs-select text-vs-accent" : "text-vs-dim hover:bg-vs-hover"
             }`}
-            title="Match Case"
+            title={t("search.matchCase")}
             onClick={() => setCaseSensitive((value) => !value)}
           >
             <CaseSensitive size={13} />
@@ -99,7 +103,7 @@ export default function SearchPanel() {
 
         {s.search.running && (
           <div className="flex items-center gap-1.5 text-2xs text-vs-dim">
-            <Loader2 size={11} className="animate-spin" /> Searching…
+            <Loader2 size={11} className="animate-spin" /> {t("search.searching")}
           </div>
         )}
         {!s.search.running && query && s.search.error && (
@@ -107,18 +111,22 @@ export default function SearchPanel() {
         )}
         {!s.search.running && query && !s.search.error && resultCount > 0 && (
           <div className="text-2xs text-vs-dim">
-            {resultCount} result{resultCount === 1 ? "" : "s"} in {s.search.results.length} file
-            {s.search.results.length === 1 ? "" : "s"}
+            {resultCount === 1 && s.search.results.length === 1
+              ? t("search.resultsOne")
+              : t("search.resultsMany", {
+                  count: resultCount,
+                  files: s.search.results.length,
+                })}
           </div>
         )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto pb-2">
         {!s.workspace && (
-          <div className="px-3 py-2 text-2xs text-vs-dim">Open a folder to search its files.</div>
+          <div className="px-3 py-2 text-2xs text-vs-dim">{t("search.noFolder")}</div>
         )}
         {s.workspace && query && !s.search.running && !s.search.error && resultCount === 0 && (
-          <div className="px-3 py-2 text-2xs text-vs-dim">No results found.</div>
+          <div className="px-3 py-2 text-2xs text-vs-dim">{t("search.noResults")}</div>
         )}
         {s.search.results.map((file) => {
           const relative = relativePath(s.workspace?.path ?? "", file.path);

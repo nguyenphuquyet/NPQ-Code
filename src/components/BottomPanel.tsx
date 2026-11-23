@@ -11,19 +11,21 @@ import {
   TerminalSquare,
 } from "lucide-react";
 import { useStudio } from "../lib/store";
+import { useI18n, type TranslationKey } from "../lib/i18n";
 import type { BottomTab } from "../lib/store";
 import { useContextMenu } from "./ContextMenu";
 import { copyText } from "../lib/clipboard";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 
-const TABS: { id: BottomTab; label: string; icon: typeof TerminalSquare }[] = [
-  { id: "problems", label: "Problems", icon: AlertCircle },
-  { id: "output", label: "Output", icon: ScrollText },
-  { id: "terminal", label: "Terminal", icon: TerminalSquare },
+const TABS: { id: BottomTab; key: TranslationKey; icon: typeof TerminalSquare }[] = [
+  { id: "problems", key: "panel.problems", icon: AlertCircle },
+  { id: "output", key: "panel.output", icon: ScrollText },
+  { id: "terminal", key: "panel.terminal", icon: TerminalSquare },
 ];
 
 export default function BottomPanel({ onHide }: { onHide: () => void }) {
   const s = useStudio();
+  const { t } = useI18n();
   const ctx = useContextMenu();
   const terminalLogRef = useRef<HTMLDivElement>(null);
   const outputLogRef = useRef<HTMLDivElement>(null);
@@ -53,20 +55,20 @@ export default function BottomPanel({ onHide }: { onHide: () => void }) {
   const onLogContextMenu = (event: ReactMouseEvent) => {
     ctx.open(event, [
       {
-        label: "Copy Log",
+        label: t("panel.copyLog"),
         icon: <ClipboardCopy size={12} />,
         disabled: s.terminal.length === 0,
         action: copyLog,
       },
       {
-        label: "Clear",
+        label: t("panel.clear"),
         icon: <Eraser size={12} />,
         disabled: s.terminal.length === 0,
         action: s.clearTerminal,
       },
       { separator: true },
       {
-        label: "Stop Running Command",
+        label: t("panel.stopRunning"),
         icon: <Square size={11} />,
         disabled: s.terminalRunning === null,
         action: () => void s.stopCommand(),
@@ -133,7 +135,7 @@ export default function BottomPanel({ onHide }: { onHide: () => void }) {
               }`}
             >
               <tab.icon size={12} />
-              {tab.label}
+              {t(tab.key)}
               {tab.id === "terminal" && s.terminalRunning !== null && (
                 <Loader2 size={11} className="animate-spin text-vs-accent" />
               )}
@@ -145,22 +147,22 @@ export default function BottomPanel({ onHide }: { onHide: () => void }) {
           <button
             className="mr-1 flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs text-vs-red hover:bg-vs-hover"
             onClick={() => void s.stopCommand()}
-            title="Stop running command"
+            title={t("panel.stopRunning")}
           >
-            <Square size={10} /> Stop
+            <Square size={10} /> {t("panel.stop")}
           </button>
         )}
         <button
           className="grid h-6 w-6 place-items-center rounded text-vs-dim hover:bg-vs-hover hover:text-vs-text"
           onClick={clearCurrent}
-          title="Clear"
+          title={t("panel.clear")}
         >
           <Eraser size={13} />
         </button>
         <button
           className="grid h-6 w-6 place-items-center rounded text-vs-dim hover:bg-vs-hover hover:text-vs-text"
           onClick={onHide}
-          title="Hide Panel"
+          title={t("panel.hidePanel")}
         >
           <ChevronDown size={14} />
         </button>
@@ -170,7 +172,7 @@ export default function BottomPanel({ onHide }: { onHide: () => void }) {
         <div className={s.bottomTab === "problems" ? "h-full" : "hidden"}>
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-2xs text-vs-dim">
             <CheckCircle2 size={22} className="text-vs-green" />
-            <span>No problems have been detected in the workspace.</span>
+            <span>{t("panel.noProblems")}</span>
           </div>
         </div>
 
@@ -180,7 +182,7 @@ export default function BottomPanel({ onHide }: { onHide: () => void }) {
             className="h-full overflow-auto px-3 py-2 font-mono text-2xs leading-relaxed"
           >
             {s.output.length === 0 && (
-              <div className="text-vs-dim">No output yet. Editor events appear here.</div>
+              <div className="text-vs-dim">{t("panel.noOutput")}</div>
             )}
             {s.output.map((line, index) => (
               <div
@@ -212,9 +214,7 @@ export default function BottomPanel({ onHide }: { onHide: () => void }) {
               className="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-2xs leading-relaxed"
             >
               {s.terminal.length === 0 && (
-                <div className="text-vs-dim">
-                  Integrated terminal. Commands run in the opened folder.
-                </div>
+                <div className="text-vs-dim">{t("panel.terminalHint")}</div>
               )}
               {s.terminal.map((line, index) => (
                 <div
@@ -244,13 +244,13 @@ export default function BottomPanel({ onHide }: { onHide: () => void }) {
                 value={command}
                 onChange={(event) => setCommand(event.target.value)}
                 onKeyDown={onInputKeyDown}
-                placeholder="Type a command and press Enter"
+                placeholder={t("panel.commandPlaceholder")}
                 spellCheck={false}
                 className="min-w-0 flex-1 bg-transparent font-mono text-2xs text-vs-text outline-none placeholder:text-vs-dim"
               />
               {s.terminalRunning !== null && (
                 <span className="flex shrink-0 items-center gap-1 text-2xs text-vs-dim">
-                  <Loader2 size={10} className="animate-spin" /> running
+                  <Loader2 size={10} className="animate-spin" /> {t("panel.running")}
                 </span>
               )}
             </div>

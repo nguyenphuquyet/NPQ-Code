@@ -6,6 +6,7 @@ import type {
   TerminalOutput,
   WorkspaceInfo,
 } from "./api";
+import { translate } from "./i18n";
 
 /**
  * Browser-only demo backend used by `npm run dev` when the Tauri IPC bridge is
@@ -190,10 +191,7 @@ export const demoApi = {
   },
   runCommand: async (_cwd: string, _command: string): Promise<number> => {
     const id = nextCommandId++;
-    const lines = [
-      "This is the browser demo — commands run only in the desktop app.",
-      "Open the Tauri build to use a real shell in this folder.",
-    ];
+    const lines = [translate("demo.browserOnly"), translate("demo.desktopOnly")];
     lines.forEach((line, index) => {
       window.setTimeout(() => {
         outputListeners.forEach((listener) => listener({ id, stream: "stderr", line }));

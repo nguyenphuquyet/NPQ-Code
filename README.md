@@ -13,6 +13,7 @@ Backend: **Tauri v2** (Rust).
 - **Quick Open**: `Ctrl+P` để mở nhanh tệp theo tên.
 - **Terminal tích hợp**: chạy lệnh shell ngay trong workspace, log stream theo thời gian thực, dừng lệnh đang chạy.
 - **Giao diện sáng đồng bộ**: một bảng màu phẳng, không gradient; thanh trạng thái kiểu VS Code.
+- **Đa ngôn ngữ**: Tiếng Việt, English, 中文 — đổi ngay trong **Cài đặt** (biểu tượng bánh răng ở thanh bên hoặc menu **Trợ giúp → Cài đặt**), lựa chọn được ghi nhớ.
 - **Recent folders**: mở lại workspace gần đây từ màn hình Welcome.
 - **Zoom giao diện**: `Ctrl+=`, `Ctrl+-`, `Ctrl+0`.
 
@@ -60,8 +61,9 @@ Output nằm trong `src-tauri/target/release/bundle/` (`.msi`/`.exe` trên Windo
 src/                     # Frontend React
   components/            # TopBar, ActivityBar, Sidebar, ProjectTree, SearchPanel,
                          # EditorArea, CodeEditor, BottomPanel, StatusBar,
-                         # WelcomeScreen, QuickOpen, ContextMenu
-  lib/                   # api.ts (invoke wrappers), store.tsx (state), window.ts, editor*
+                         # WelcomeScreen, QuickOpen, ContextMenu, SettingsDialog
+  lib/                   # api.ts (invoke wrappers), store.tsx (state), i18n.tsx (vi/en/zh),
+                         # window.ts, editor*
 src-tauri/
   src/
     commands/            # project.rs (workspace + recent), fs.rs (file tree/IO),

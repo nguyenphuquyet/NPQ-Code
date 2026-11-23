@@ -3,6 +3,7 @@ import {
   type ReactNode,
 } from "react";
 import { copyText, readText } from "../lib/clipboard";
+import { useI18n, type TranslationKey } from "../lib/i18n";
 
 export type ContextMenuItem =
   | { separator: true }
@@ -43,6 +44,7 @@ const claimed = new WeakSet<Event>();
  * menu is shown for right-clicks that no component claimed.
  */
 export function ContextMenuProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -57,11 +59,11 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
     const onContextMenu = (e: MouseEvent) => {
       e.preventDefault(); // never show the WebView's built-in menu
       if (claimed.has(e)) return;
-      setMenu({ x: e.clientX, y: e.clientY, items: fallbackItems(e.target) });
+      setMenu({ x: e.clientX, y: e.clientY, items: fallbackItems(e.target, t) });
     };
     document.addEventListener("contextmenu", onContextMenu);
     return () => document.removeEventListener("contextmenu", onContextMenu);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!menu) return;
@@ -137,7 +139,10 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
 }
 
 /** Generic menu for right-clicks no component claimed (editors, inputs, text). */
-function fallbackItems(target: EventTarget | null): ContextMenuItem[] {
+function fallbackItems(
+  target: EventTarget | null,
+  t: (key: TranslationKey) => string,
+): ContextMenuItem[] {
   const el = target instanceof HTMLElement ? target : null;
   const editable =
     !!el && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA");
@@ -145,12 +150,12 @@ function fallbackItems(target: EventTarget | null): ContextMenuItem[] {
 
   if (editable) {
     return [
-      { label: "Cut", shortcut: "Ctrl+X", disabled: !selection, action: () => void cutFromElement(el) },
-      { label: "Copy", shortcut: "Ctrl+C", disabled: !selection, action: () => void copyText(selection) },
-      { label: "Paste", shortcut: "Ctrl+V", action: () => void pasteIntoElement(el) },
+      { label: t("ctx.cut"), shortcut: "Ctrl+X", disabled: !selection, action: () => void cutFromElement(el) },
+      { label: t("ctx.copy"), shortcut: "Ctrl+C", disabled: !selection, action: () => void copyText(selection) },
+      { label: t("ctx.paste"), shortcut: "Ctrl+V", action: () => void pasteIntoElement(el) },
       { separator: true },
       {
-        label: "Select All",
+        label: t("ctx.selectAll"),
         shortcut: "Ctrl+A",
         action: () => {
           el?.focus();
@@ -161,8 +166,8 @@ function fallbackItems(target: EventTarget | null): ContextMenuItem[] {
   }
 
   return [
-    { label: "Copy", shortcut: "Ctrl+C", disabled: !selection, action: () => void copyText(selection) },
-    { label: "Select All", shortcut: "Ctrl+A", action: () => document.execCommand("selectAll") },
+    { label: t("ctx.copy"), shortcut: "Ctrl+C", disabled: !selection, action: () => void copyText(selection) },
+    { label: t("ctx.selectAll"), shortcut: "Ctrl+A", action: () => document.execCommand("selectAll") },
   ];
 }
 

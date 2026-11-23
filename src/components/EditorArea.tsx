@@ -1,6 +1,7 @@
 import { ChevronRight, FileCode2, X } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useStudio } from "../lib/store";
+import { useI18n } from "../lib/i18n";
 import { fileLanguage, relativePath } from "../lib/api";
 import CodeEditor from "./CodeEditor";
 import { useContextMenu } from "./ContextMenu";
@@ -26,6 +27,7 @@ function tabIcon(name: string) {
 
 export default function EditorArea() {
   const s = useStudio();
+  const { t } = useI18n();
   const ctx = useContextMenu();
   const active = s.openFiles.find((file) => file.path === s.activePath);
 
@@ -36,39 +38,39 @@ export default function EditorArea() {
   const onEditorContextMenu = (event: ReactMouseEvent) => {
     const view = getActiveEditor();
     ctx.open(event, [
-      { label: "Undo", shortcut: "Ctrl+Z", disabled: !view, action: editorUndo },
-      { label: "Redo", shortcut: "Ctrl+Y", disabled: !view, action: editorRedo },
+      { label: t("menu.undo"), shortcut: "Ctrl+Z", disabled: !view, action: editorUndo },
+      { label: t("menu.redo"), shortcut: "Ctrl+Y", disabled: !view, action: editorRedo },
       { separator: true },
-      { label: "Cut", shortcut: "Ctrl+X", disabled: !hasEditorSelection(), action: () => void editorCut() },
-      { label: "Copy", shortcut: "Ctrl+C", disabled: !hasEditorSelection(), action: () => void editorCopy() },
-      { label: "Paste", shortcut: "Ctrl+V", disabled: !view, action: () => void editorPaste() },
+      { label: t("menu.cut"), shortcut: "Ctrl+X", disabled: !hasEditorSelection(), action: () => void editorCut() },
+      { label: t("menu.copy"), shortcut: "Ctrl+C", disabled: !hasEditorSelection(), action: () => void editorCopy() },
+      { label: t("menu.paste"), shortcut: "Ctrl+V", disabled: !view, action: () => void editorPaste() },
       { separator: true },
-      { label: "Select All", shortcut: "Ctrl+A", disabled: !view, action: editorSelectAll },
-      { label: "Find…", shortcut: "Ctrl+F", disabled: !view, action: editorFind },
+      { label: t("menu.selectAll"), shortcut: "Ctrl+A", disabled: !view, action: editorSelectAll },
+      { label: `${t("menu.find")}…`, shortcut: "Ctrl+F", disabled: !view, action: editorFind },
       { separator: true },
       {
-        label: "Save",
+        label: t("editor.tabSave"),
         shortcut: "Ctrl+S",
         disabled: !active?.dirty,
         action: () => active && void s.saveFile(active.path),
       },
-      { label: "Copy Path", action: () => active && void copyText(active.path) },
+      { label: t("editor.tabCopyPath"), action: () => active && void copyText(active.path) },
     ]);
   };
 
   const onTabContextMenu = (event: ReactMouseEvent, path: string, dirty: boolean) => {
     ctx.open(event, [
-      { label: "Save", shortcut: "Ctrl+S", disabled: !dirty, action: () => void s.saveFile(path) },
+      { label: t("editor.tabSave"), shortcut: "Ctrl+S", disabled: !dirty, action: () => void s.saveFile(path) },
       { separator: true },
-      { label: "Close", shortcut: "Ctrl+W", action: () => s.closeTab(path) },
+      { label: t("editor.tabClose"), shortcut: "Ctrl+W", action: () => s.closeTab(path) },
       {
-        label: "Close Others",
+        label: t("editor.tabCloseOthers"),
         disabled: s.openFiles.length < 2,
         action: () => s.closeOtherTabs(path),
       },
-      { label: "Close All", action: () => s.closeAllTabs() },
+      { label: t("editor.tabCloseAll"), action: () => s.closeAllTabs() },
       { separator: true },
-      { label: "Copy Path", action: () => void copyText(path) },
+      { label: t("editor.tabCopyPath"), action: () => void copyText(path) },
     ]);
   };
 
@@ -101,7 +103,7 @@ export default function EditorArea() {
                     event.stopPropagation();
                     void s.saveFile(file.path);
                   }}
-                  title="Unsaved changes — click to save"
+                  title={t("editor.tabUnsaved")}
                 />
               ) : null}
               <button
@@ -112,7 +114,7 @@ export default function EditorArea() {
                   event.stopPropagation();
                   s.closeTab(file.path);
                 }}
-                title="Close"
+                title={t("editor.tabClose")}
               >
                 <X size={12} />
               </button>
@@ -154,11 +156,8 @@ export default function EditorArea() {
                 <FileCode2 size={30} className="text-vs-accent" />
               </div>
               <p className="mb-1 text-sm text-vs-strong">NPQ Code</p>
-              <p className="text-2xs">Open a file from the Explorer to start editing.</p>
-              <p className="mt-3 text-2xs">
-                Press <kbd className="rounded bg-vs-sidebar px-1">Ctrl+P</kbd> to search files or{" "}
-                <kbd className="rounded bg-vs-sidebar px-1">Ctrl+`</kbd> for the terminal.
-              </p>
+              <p className="text-2xs">{t("editor.emptyHint")}</p>
+              <p className="mt-3 text-2xs">{t("editor.emptyQuick")}</p>
             </div>
           </div>
         )}
