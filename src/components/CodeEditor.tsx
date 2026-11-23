@@ -298,5 +298,16 @@ export default function CodeEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reveal?.nonce]);
 
+  // Read-only documents (git diffs) can be refreshed in place when the panel
+  // re-opens them, so mirror prop updates into the existing document.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !readOnly) return;
+    if (view.state.doc.toString() === content) return;
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: content },
+    });
+  }, [content, readOnly]);
+
   return <div ref={hostRef} className="h-full w-full overflow-hidden" />;
 }

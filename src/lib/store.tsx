@@ -368,13 +368,12 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       const root = (git.status?.repo_root ?? workspace.path).replace(/[\\/]+$/, "");
       const key = `git-diff:${staged ? "staged" : "worktree"}:${path}`;
       setActivePath(key);
-      if (openFiles.some((file) => file.path === key)) return;
       try {
         const diff = await api.gitDiff(root, path, staged);
         const content = diff.trim() ? diff : t("git.noDiff");
         setOpenFiles((prev) =>
           prev.some((file) => file.path === key)
-            ? prev
+            ? prev.map((file) => (file.path === key ? { ...file, content } : file))
             : [
                 ...prev,
                 {
@@ -399,7 +398,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         setActivePath((current) => (current === key ? null : current));
       }
     },
-    [git.status, openFiles, showToast, t, workspace],
+    [git.status, showToast, t, workspace],
   );
 
   // Keep the panel fresh when the folder opens, on window focus, and (cheaply)
