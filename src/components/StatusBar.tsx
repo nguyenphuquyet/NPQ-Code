@@ -1,4 +1,13 @@
-import { AlertCircle, FolderOpen, Loader2, TerminalSquare, ZoomIn } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowDown,
+  ArrowUp,
+  FolderOpen,
+  GitBranch,
+  Loader2,
+  TerminalSquare,
+  ZoomIn,
+} from "lucide-react";
 import { useStudio } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 
@@ -40,6 +49,31 @@ export default function StatusBar() {
       >
         <AlertCircle size={12} /> 0
       </button>
+
+      {s.git.status?.is_repo && (
+        <button
+          className="flex h-full min-w-0 items-center gap-1 px-2 hover:bg-white/15"
+          onClick={() => s.setSidebarView("git")}
+          title={t("activity.sourceControl")}
+        >
+          <GitBranch size={12} />
+          <span className="max-w-[160px] truncate">
+            {s.git.status.branch ?? t("git.detached")}
+          </span>
+          {s.git.status.ahead > 0 && (
+            <span className="flex items-center">
+              <ArrowUp size={10} />
+              {s.git.status.ahead}
+            </span>
+          )}
+          {s.git.status.behind > 0 && (
+            <span className="flex items-center">
+              <ArrowDown size={10} />
+              {s.git.status.behind}
+            </span>
+          )}
+        </button>
+      )}
 
       {s.terminalRunning !== null && (
         <button

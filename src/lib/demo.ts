@@ -1,5 +1,8 @@
 import type {
   FileNode,
+  GitBranchList,
+  GitFile,
+  GitStatus,
   RecentWorkspace,
   SearchFile,
   TerminalDone,
@@ -131,6 +134,94 @@ const recent: RecentWorkspace[] = [
   { path: demoWorkspace.path, name: demoWorkspace.name, opened_at: Date.now() },
 ];
 
+/**
+ * Fake repository so the Source Control panel can be exercised in the browser.
+ * The desktop build talks to real `git` through the Rust commands.
+ */
+const demoGit = {
+  branch: "main",
+  ahead: 1,
+  behind: 0,
+  staged: [
+    { path: "src/App.tsx", orig_path: null, status: "modified", staged: true },
+  ] as GitFile[],
+  changes: [
+    { path: "src/styles.css", orig_path: null, status: "modified", staged: false },
+    { path: "src/components/Button.tsx", orig_path: null, status: "deleted", staged: false },
+  ] as GitFile[],
+  untracked: [{ path: "notes.txt", orig_path: null, status: "untracked", staged: false }] as GitFile[],
+};
+
+function demoRelative(path: string) {
+  const prefix = `${demoWorkspace.path}/`;
+  return path.startsWith(prefix) ? path.slice(prefix.length) : path.split("/").pop() ?? path;
+}
+
+function demoMarkChanged(path: string) {
+  const relative = demoRelative(path);
+  const known =
+    demoGit.staged.some((file) => file.path === relative) ||
+    demoGit.changes.some((file) => file.path === relative) ||
+    demoGit.untracked.some((file) => file.path === relative);
+  if (known) return;
+  demoGit.changes.push({
+    path: relative,
+    orig_path: null,
+    status: "modified",
+    staged: false,
+  });
+  demoGit.changes.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+const demoDiff = (path: string, staged: boolean): string => {
+  const file = [...demoGit.staged, ...demoGit.changes, ...demoGit.untracked].find(
+    (item) => item.path === path,
+  );
+  if (!file) return "";
+  if (file.status === "untracked" || (file.status === "added" && !staged)) {
+    return [
+      `diff --git a/${path} b/${path}`,
+      "new file mode 100644",
+      "--- /dev/null",
+      `+++ b/${path}`,
+      "@@ -0,0 +1,4 @@",
+      `+// ${path}`,
+      "+export const demo = true;",
+      "+",
+      "+export default demo;",
+      "",
+    ].join("\n");
+  }
+  if (file.status === "deleted") {
+    return [
+      `diff --git a/${path} b/${path}`,
+      "deleted file mode 100644",
+      `--- a/${path}`,
+      "+++ /dev/null",
+      "@@ -1,4 +0,0 @@",
+      "-export function Button() {",
+      "-  return <button>Click</button>;",
+      "-}",
+      "",
+    ].join("\n");
+  }
+  return [
+    `diff --git a/${path} b/${path}`,
+    "index 8f3c2a1..4d7e9b0 100644",
+    `--- a/${path}`,
+    `+++ b/${path}`,
+    "@@ -1,6 +1,7 @@",
+    ' import { useMemo } from "react";',
+    "",
+    '-const version = "0.1.0";',
+    '+const version = "0.2.0";',
+    '+const author = "NPQ Code";',
+    "",
+    " export default function App() {",
+    "",
+  ].join("\n");
+};
+
 export const demoApi = {
   openWorkspace: async (path: string): Promise<WorkspaceInfo> => ({
     ...demoWorkspace,
@@ -149,9 +240,20 @@ export const demoApi = {
   },
   writeFile: async (path: string, content: string): Promise<void> => {
     files.set(path, content);
+    demoMarkChanged(path);
   },
   createFile: async (path: string): Promise<void> => {
     files.set(path, "");
+    const relative = demoRelative(path);
+    if (![...demoGit.staged, ...demoGit.changes, ...demoGit.untracked].some((f) => f.path === relative)) {
+      demoGit.untracked.push({
+        path: relative,
+        orig_path: null,
+        status: "untracked",
+        staged: false,
+      });
+      demoGit.untracked.sort((a, b) => a.path.localeCompare(b.path));
+    }
   },
   createDirectory: async (): Promise<void> => {
     /* folders are derived from file paths in the demo tree */
@@ -160,6 +262,11 @@ export const demoApi = {
     for (const file of Array.from(files.keys())) {
       if (file === path || file.startsWith(`${path}/`)) files.delete(file);
     }
+    const relative = demoRelative(path);
+    const matches = (file: GitFile) => file.path === relative || file.path.startsWith(`${relative}/`);
+    demoGit.staged = demoGit.staged.filter((file) => !matches(file));
+    demoGit.changes = demoGit.changes.filter((file) => !matches(file));
+    demoGit.untracked = demoGit.untracked.filter((file) => !matches(file));
   },
   renamePath: async (oldPath: string, newPath: string): Promise<void> => {
     for (const file of Array.from(files.keys())) {
@@ -167,6 +274,17 @@ export const demoApi = {
       const content = files.get(file) ?? "";
       files.delete(file);
       files.set(newPath + file.slice(oldPath.length), content);
+    }
+    const from = demoRelative(oldPath);
+    const to = demoRelative(newPath);
+    for (const list of [demoGit.staged, demoGit.changes, demoGit.untracked]) {
+      for (const file of list) {
+        if (file.path === from || file.path.startsWith(`${from}/`)) {
+          file.path = to + file.path.slice(from.length);
+          file.status = "renamed";
+          file.orig_path = file.orig_path ?? from;
+        }
+      }
     }
   },
   searchWorkspace: async (
@@ -208,6 +326,76 @@ export const demoApi = {
   stopAllCommands: async (): Promise<void> => {
     /* nothing is running */
   },
+  gitStatus: async (root: string): Promise<GitStatus> => ({
+    is_repo: true,
+    repo_root: root,
+    branch: demoGit.branch,
+    upstream: `origin/${demoGit.branch}`,
+    ahead: demoGit.ahead,
+    behind: demoGit.behind,
+    staged: demoGit.staged.map((file) => ({ ...file })),
+    changes: demoGit.changes.map((file) => ({ ...file })),
+    untracked: demoGit.untracked.map((file) => ({ ...file })),
+  }),
+  gitStage: async (_root: string, paths: string[]): Promise<string> => {
+    const wanted = new Set(paths);
+    const moved = [...demoGit.changes, ...demoGit.untracked].filter((file) => wanted.has(file.path));
+    demoGit.changes = demoGit.changes.filter((file) => !wanted.has(file.path));
+    demoGit.untracked = demoGit.untracked.filter((file) => !wanted.has(file.path));
+    for (const file of moved) {
+      demoGit.staged = [
+        ...demoGit.staged.filter((item) => item.path !== file.path),
+        { ...file, staged: true, status: file.status === "untracked" ? "added" : file.status },
+      ];
+    }
+    demoGit.staged.sort((a, b) => a.path.localeCompare(b.path));
+    return "";
+  },
+  gitUnstage: async (_root: string, paths: string[]): Promise<string> => {
+    const wanted = new Set(paths);
+    const moved = demoGit.staged.filter((file) => wanted.has(file.path));
+    demoGit.staged = demoGit.staged.filter((file) => !wanted.has(file.path));
+    for (const file of moved) {
+      demoGit.changes = [
+        ...demoGit.changes.filter((item) => item.path !== file.path),
+        { ...file, staged: false, status: file.status === "added" ? "modified" : file.status },
+      ];
+    }
+    demoGit.changes.sort((a, b) => a.path.localeCompare(b.path));
+    return "";
+  },
+  gitDiscard: async (_root: string, paths: string[]): Promise<string> => {
+    const wanted = new Set(paths);
+    demoGit.changes = demoGit.changes.filter((file) => !wanted.has(file.path));
+    demoGit.untracked = demoGit.untracked.filter((file) => !wanted.has(file.path));
+    return "";
+  },
+  gitCommit: async (_root: string, message: string): Promise<string> => {
+    if (!message.trim()) throw new Error("EMPTY_MESSAGE");
+    if (demoGit.staged.length === 0) throw new Error("nothing to commit, working tree clean");
+    demoGit.staged = [];
+    demoGit.ahead += 1;
+    return "[main] demo commit";
+  },
+  gitPush: async (): Promise<string> => {
+    demoGit.ahead = 0;
+    return "Everything up-to-date";
+  },
+  gitPull: async (): Promise<string> => {
+    demoGit.behind = 0;
+    return "Already up to date.";
+  },
+  gitInit: async (): Promise<string> => "Initialized empty Git repository",
+  gitBranches: async (): Promise<GitBranchList> => ({
+    current: demoGit.branch,
+    branches: ["feat/source-control", "main"],
+  }),
+  gitCheckout: async (_root: string, branch: string): Promise<string> => {
+    demoGit.branch = branch;
+    return `Switched to branch '${branch}'`;
+  },
+  gitDiff: async (_root: string, path: string, staged: boolean): Promise<string> =>
+    demoDiff(path, staged),
   pickDirectory: async (): Promise<string | null> => demoWorkspace.path,
 };
 

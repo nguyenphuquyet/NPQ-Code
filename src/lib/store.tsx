@@ -14,6 +14,7 @@ import {
   onTerminalOutput,
   type EditorLanguage,
   type FileNode,
+  type GitStatus,
   type RecentWorkspace,
   type SearchFile,
   type WorkspaceInfo,
@@ -26,6 +27,19 @@ export type OpenFile = {
   language: EditorLanguage;
   content: string;
   dirty: boolean;
+  /** Read-only documents (git diffs) never write back to disk. */
+  readOnly?: boolean;
+  /** Render as a unified diff with add/remove line colours. */
+  diff?: boolean;
+  /** Real file the document was derived from, for breadcrumbs. */
+  sourcePath?: string;
+};
+
+export type GitState = {
+  status: GitStatus | null;
+  loading: boolean;
+  busy: boolean;
+  error: string | null;
 };
 
 export type SidebarView = "explorer" | "search" | "git" | "extensions";
@@ -95,6 +109,7 @@ type StudioState = {
   toast: string | null;
   uiScale: number;
   settingsOpen: boolean;
+  git: GitState;
 
   loadRecent: () => void;
   openWorkspace: (path: string) => Promise<void>;
@@ -135,6 +150,16 @@ type StudioState = {
   zoomOut: () => void;
   resetZoom: () => void;
   removeRecent: (path: string) => void;
+  refreshGit: () => Promise<void>;
+  stageGit: (paths: string[]) => Promise<void>;
+  unstageGit: (paths: string[]) => Promise<void>;
+  discardGit: (paths: string[]) => Promise<void>;
+  commitGit: (message: string) => Promise<boolean>;
+  pushGit: () => Promise<void>;
+  pullGit: () => Promise<void>;
+  initGit: () => Promise<void>;
+  checkoutGit: (branch: string) => Promise<void>;
+  openGitDiff: (path: string, staged: boolean) => Promise<void>;
 };
 
 const Ctx = createContext<StudioState | null>(null);
@@ -174,8 +199,15 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [uiScale, setUiScale] = useState(readStoredScale);
+  const [git, setGit] = useState<GitState>({
+    status: null,
+    loading: false,
+    busy: false,
+    error: null,
+  });
   const toastTimer = useRef<number | null>(null);
   const searchSeq = useRef(0);
+  const gitSeq = useRef(0);
   const revealSeq = useRef(0);
   const finishedCommands = useRef<Set<number>>(new Set());
 
@@ -220,6 +252,175 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const appendOutput = useCallback((line: string, stream: LogStream = "info") => {
     setOutput((prev) => [...prev.slice(-500), { stream, line }]);
   }, []);
+
+  /* ------------------------------------------------------------------ Git */
+
+  const refreshGitFor = useCallback(
+    async (root: string) => {
+      const seq = ++gitSeq.current;
+      setGit((prev) => ({ ...prev, loading: true }));
+      try {
+        const status = await api.gitStatus(root);
+        if (gitSeq.current !== seq) return;
+        setGit({ status, loading: false, busy: false, error: null });
+      } catch (error) {
+        if (gitSeq.current !== seq) return;
+        const raw = String(error);
+        setGit((prev) => ({
+          ...prev,
+          loading: false,
+          busy: false,
+          error: raw === "GIT_NOT_FOUND" ? t("git.notInstalled") : raw,
+        }));
+      }
+    },
+    [t],
+  );
+
+  const refreshGit = useCallback(async () => {
+    if (!workspace) return;
+    await refreshGitFor(workspace.path);
+  }, [refreshGitFor, workspace]);
+
+  const runGit = useCallback(
+    async (action: (root: string) => Promise<unknown>, success?: string) => {
+      if (!workspace) {
+        showToast(t("msg.openFolderFirst"));
+        return false;
+      }
+      const root = git.status?.repo_root ?? workspace.path;
+      setGit((prev) => ({ ...prev, busy: true }));
+      try {
+        await action(root);
+        await refreshGitFor(root);
+        if (success) showToast(success);
+        return true;
+      } catch (error) {
+        setGit((prev) => ({ ...prev, busy: false }));
+        const raw = String(error);
+        showToast(
+          raw === "GIT_NOT_FOUND"
+            ? t("git.notInstalled")
+            : raw === "EMPTY_MESSAGE"
+              ? t("git.emptyMessage")
+              : t("git.actionFailed", { message: raw }),
+        );
+        return false;
+      }
+    },
+    [git.status, refreshGitFor, showToast, t, workspace],
+  );
+
+  const stageGit = useCallback(
+    async (paths: string[]) => {
+      await runGit(
+        (root) => api.gitStage(root, paths),
+        t("git.stagedMsg", { count: paths.length }),
+      );
+    },
+    [runGit, t],
+  );
+
+  const unstageGit = useCallback(
+    async (paths: string[]) => {
+      await runGit(
+        (root) => api.gitUnstage(root, paths),
+        t("git.unstagedMsg", { count: paths.length }),
+      );
+    },
+    [runGit, t],
+  );
+
+  const discardGit = useCallback(
+    async (paths: string[]) => {
+      await runGit((root) => api.gitDiscard(root, paths), t("git.discardedMsg"));
+    },
+    [runGit, t],
+  );
+
+  const commitGit = useCallback(
+    (message: string) => runGit((root) => api.gitCommit(root, message), t("git.committed")),
+    [runGit, t],
+  );
+
+  const pushGit = useCallback(async () => {
+    await runGit((root) => api.gitPush(root), t("git.pushed"));
+  }, [runGit, t]);
+
+  const pullGit = useCallback(async () => {
+    await runGit((root) => api.gitPull(root), t("git.pulled"));
+  }, [runGit, t]);
+
+  const initGit = useCallback(async () => {
+    await runGit((root) => api.gitInit(root), t("git.initDone"));
+  }, [runGit, t]);
+
+  const checkoutGit = useCallback(
+    async (branch: string) => {
+      await runGit((root) => api.gitCheckout(root, branch), t("git.checkedOut", { branch }));
+    },
+    [runGit, t],
+  );
+
+  const openGitDiff = useCallback(
+    async (path: string, staged: boolean) => {
+      if (!workspace) return;
+      const root = (git.status?.repo_root ?? workspace.path).replace(/[\\/]+$/, "");
+      const key = `git-diff:${staged ? "staged" : "worktree"}:${path}`;
+      setActivePath(key);
+      if (openFiles.some((file) => file.path === key)) return;
+      try {
+        const diff = await api.gitDiff(root, path, staged);
+        const content = diff.trim() ? diff : t("git.noDiff");
+        setOpenFiles((prev) =>
+          prev.some((file) => file.path === key)
+            ? prev
+            : [
+                ...prev,
+                {
+                  path: key,
+                  name: `${fileName(path)} ${t("git.diffSuffix")}`,
+                  language: "text",
+                  content,
+                  dirty: false,
+                  readOnly: true,
+                  diff: true,
+                  sourcePath: `${root}/${path}`,
+                },
+              ],
+        );
+      } catch (error) {
+        const raw = String(error);
+        showToast(
+          raw === "GIT_NOT_FOUND"
+            ? t("git.notInstalled")
+            : t("git.actionFailed", { message: raw }),
+        );
+        setActivePath((current) => (current === key ? null : current));
+      }
+    },
+    [git.status, openFiles, showToast, t, workspace],
+  );
+
+  // Keep the panel fresh when the folder opens, on window focus, and (cheaply)
+  // while the Source Control view is visible.
+  useEffect(() => {
+    if (!workspace) return;
+    void refreshGitFor(workspace.path);
+  }, [refreshGitFor, workspace]);
+
+  useEffect(() => {
+    if (!workspace || sidebarView !== "git") return;
+    const timer = window.setInterval(() => void refreshGitFor(workspace.path), 6000);
+    return () => window.clearInterval(timer);
+  }, [refreshGitFor, sidebarView, workspace]);
+
+  useEffect(() => {
+    if (!workspace) return;
+    const onFocus = () => void refreshGitFor(workspace.path);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshGitFor, workspace]);
 
   const loadRecent = useCallback(() => {
     api.recentWorkspaces().then(setRecent).catch(() => {});
@@ -266,7 +467,8 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       .listTree(workspace.path)
       .then(setTree)
       .catch((error) => showToast(String(error)));
-  }, [workspace, showToast]);
+    void refreshGit();
+  }, [workspace, showToast, refreshGit]);
 
   const openFile = useCallback(
     async (path: string) => {
@@ -309,9 +511,11 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         setTerminalRunning(null);
         setSearch({ query: "", caseSensitive: false, results: [], running: false, error: null });
         setBottomVisible(false);
+        setGit({ status: null, loading: false, busy: false, error: null });
         const nextTree = await api.listTree(info.path);
         setTree(nextTree);
         loadRecent();
+        void refreshGitFor(info.path);
         appendOutput(t("msg.workspaceOpened", { path: info.path }));
         showToast(t("msg.opened", { name: info.name }));
         setSidebarView("explorer");
@@ -320,7 +524,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         showToast(String(error));
       }
     },
-    [appendOutput, loadRecent, showToast, t],
+    [appendOutput, loadRecent, refreshGitFor, showToast, t],
   );
 
   const closeWorkspace = useCallback(() => {
@@ -336,6 +540,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     setTerminalRunning(null);
     setOutput([]);
     setSearch({ query: "", caseSensitive: false, results: [], running: false, error: null });
+    setGit({ status: null, loading: false, busy: false, error: null });
     setBottomVisible(false);
     loadRecent();
   }, [loadRecent, openFiles]);
@@ -380,14 +585,16 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
 
   const updateContent = useCallback((path: string, content: string) => {
     setOpenFiles((prev) =>
-      prev.map((file) => (file.path === path ? { ...file, content, dirty: true } : file)),
+      prev.map((file) =>
+        file.path === path && !file.readOnly ? { ...file, content, dirty: true } : file,
+      ),
     );
   }, []);
 
   const saveFile = useCallback(
     async (path: string) => {
       const file = openFiles.find((item) => item.path === path);
-      if (!file || !file.dirty) return;
+      if (!file || !file.dirty || file.readOnly) return;
       try {
         await api.writeFile(path, file.content);
         setOpenFiles((prev) =>
@@ -395,27 +602,31 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         );
         appendOutput(t("msg.saved", { name: file.name }));
         showToast(t("msg.saved", { name: file.name }));
+        void refreshGit();
       } catch (error) {
         appendOutput(String(error), "error");
         showToast(String(error));
       }
     },
-    [appendOutput, openFiles, showToast, t],
+    [appendOutput, openFiles, refreshGit, showToast, t],
   );
 
   const saveAll = useCallback(async () => {
-    const dirtyFiles = openFiles.filter((file) => file.dirty);
+    const dirtyFiles = openFiles.filter((file) => file.dirty && !file.readOnly);
     if (dirtyFiles.length === 0) return;
     try {
       for (const file of dirtyFiles) await api.writeFile(file.path, file.content);
-      setOpenFiles((prev) => prev.map((file) => ({ ...file, dirty: false })));
+      setOpenFiles((prev) =>
+        prev.map((file) => (file.readOnly ? file : { ...file, dirty: false })),
+      );
       appendOutput(t("msg.savedCount", { count: dirtyFiles.length }));
       showToast(t("msg.savedAll"));
+      void refreshGit();
     } catch (error) {
       appendOutput(String(error), "error");
       showToast(String(error));
     }
-  }, [appendOutput, openFiles, showToast, t]);
+  }, [appendOutput, openFiles, refreshGit, showToast, t]);
 
   const runCommand = useCallback(
     async (command: string) => {
@@ -649,6 +860,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     toast,
     uiScale,
     settingsOpen,
+    git,
     loadRecent,
     openWorkspace,
     closeWorkspace,
@@ -693,6 +905,16 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     removeRecent: (path: string) => {
       api.removeRecent(path).then(loadRecent).catch(() => {});
     },
+    refreshGit,
+    stageGit,
+    unstageGit,
+    discardGit,
+    commitGit,
+    pushGit,
+    pullGit,
+    initGit,
+    checkoutGit,
+    openGitDiff,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

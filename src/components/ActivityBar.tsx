@@ -13,6 +13,10 @@ const VIEWS: { id: SidebarView; key: TranslationKey; icon: typeof Files }[] = [
 export default function ActivityBar() {
   const s = useStudio();
   const { t } = useI18n();
+  const gitStatus = s.git.status;
+  const gitCount = gitStatus
+    ? gitStatus.staged.length + gitStatus.changes.length + gitStatus.untracked.length
+    : 0;
 
   const select = (view: SidebarView) => {
     if (s.sidebarVisible && s.sidebarView === view) {
@@ -38,6 +42,11 @@ export default function ActivityBar() {
           >
             {active && <span className="absolute left-0 h-full w-0.5 bg-vs-accent" />}
             <view.icon size={19} />
+            {view.id === "git" && gitCount > 0 && (
+              <span className="absolute bottom-0.5 right-1 min-w-[15px] rounded-full bg-vs-accent px-1 text-center text-[9px] font-semibold leading-[14px] text-white">
+                {gitCount > 99 ? "99+" : gitCount}
+              </span>
+            )}
           </button>
         );
       })}

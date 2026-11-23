@@ -400,6 +400,21 @@ body,
   font-family: inherit;
 }
 
+/* Unified diff tab: tint whole lines, similar to VS Code's diff editor. */
+.cm-line.cm-diff-add {
+  background-color: rgb(var(--vs-green) / 0.16);
+}
+.cm-line.cm-diff-del {
+  background-color: rgb(var(--vs-red) / 0.16);
+}
+.cm-line.cm-diff-hunk {
+  background-color: rgb(var(--vs-accent) / 0.1);
+  color: rgb(var(--vs-accent));
+}
+.cm-line.cm-diff-meta {
+  color: rgb(var(--vs-dim));
+}
+
 input,
 textarea,
 select {

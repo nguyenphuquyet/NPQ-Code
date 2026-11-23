@@ -52,6 +52,39 @@ export type TerminalDone = {
   success: boolean;
 };
 
+export type GitFileStatus =
+  | "modified"
+  | "added"
+  | "deleted"
+  | "renamed"
+  | "copied"
+  | "conflicted"
+  | "untracked";
+
+export type GitFile = {
+  path: string;
+  orig_path: string | null;
+  status: GitFileStatus;
+  staged: boolean;
+};
+
+export type GitStatus = {
+  is_repo: boolean;
+  repo_root: string | null;
+  branch: string | null;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  staged: GitFile[];
+  changes: GitFile[];
+  untracked: GitFile[];
+};
+
+export type GitBranchList = {
+  current: string | null;
+  branches: string[];
+};
+
 export type EditorLanguage =
   | "tsx"
   | "ts"
@@ -80,6 +113,20 @@ const tauriApi = {
     invoke<number>("run_command", { cwd, command }),
   stopCommand: (id: number) => invoke<void>("stop_command", { id }),
   stopAllCommands: () => invoke<void>("stop_all_commands"),
+  gitStatus: (root: string) => invoke<GitStatus>("git_status", { root }),
+  gitStage: (root: string, paths: string[]) => invoke<string>("git_stage", { root, paths }),
+  gitUnstage: (root: string, paths: string[]) => invoke<string>("git_unstage", { root, paths }),
+  gitDiscard: (root: string, paths: string[]) => invoke<string>("git_discard", { root, paths }),
+  gitCommit: (root: string, message: string) =>
+    invoke<string>("git_commit", { root, message }),
+  gitPush: (root: string) => invoke<string>("git_push", { root }),
+  gitPull: (root: string) => invoke<string>("git_pull", { root }),
+  gitInit: (root: string) => invoke<string>("git_init", { root }),
+  gitBranches: (root: string) => invoke<GitBranchList>("git_branches", { root }),
+  gitCheckout: (root: string, branch: string) =>
+    invoke<string>("git_checkout", { root, branch }),
+  gitDiff: (root: string, path: string, staged: boolean) =>
+    invoke<string>("git_diff", { root, path, staged }),
   pickDirectory: async () =>
     (await openDialog({ directory: true, multiple: false })) as string | null,
 };

@@ -12,6 +12,7 @@ Backend: **Tauri v2** (Rust).
 - **Tìm kiếm toàn workspace**: panel Search (`Ctrl+Shift+F`), kết quả theo tệp, bấm để nhảy đúng dòng/cột.
 - **Quick Open**: `Ctrl+P` để mở nhanh tệp theo tên.
 - **Terminal tích hợp**: chạy lệnh shell ngay trong workspace, log stream theo thời gian thực, dừng lệnh đang chạy.
+- **Git / Source Control**: panel Git thật (gọi `git` CLI), hiển thị nhánh, ahead/behind, thay đổi đã stage/chưa stage/chưa theo dõi; stage, bỏ stage, huỷ thay đổi, commit (`Ctrl+Enter`), push/pull, chuyển nhánh, khởi tạo repo; mở diff từng tệp ngay trong editor (tab read-only tô màu dòng thêm/xoá).
 - **Giao diện & chủ đề**: thanh trạng thái kiểu VS Code, bảng màu phẳng không gradient; 4 chủ đề **Light+** (mặc định), **Dark+**, **High Contrast**, **Solarized Light** — đổi trong **Cài đặt**, áp dụng ngay và được ghi nhớ.
 - **Đa ngôn ngữ**: Tiếng Việt, English, 中文 — đổi ngay trong **Cài đặt** (biểu tượng bánh răng ở thanh bên hoặc menu **Trợ giúp → Cài đặt**), lựa chọn được ghi nhớ.
 - **Recent folders**: mở lại workspace gần đây từ màn hình Welcome.
@@ -45,7 +46,7 @@ npm install
 npm run dev
 ```
 
-Khi chạy bằng trình duyệt, ứng dụng tự dùng workspace demo trong bộ nhớ (thư mục `/demo/npq-code`) để xem được Explorer, editor, search và terminal. Bản desktop luôn đọc thư mục thật trên đĩa.
+Khi chạy bằng trình duyệt, ứng dụng tự dùng workspace demo trong bộ nhớ (thư mục `/demo/npq-code`) để xem được Explorer, editor, search, terminal và panel Git (với một repo giả). Bản desktop luôn đọc thư mục thật trên đĩa và gọi `git` thật.
 
 ## Build bản release
 
@@ -60,14 +61,15 @@ Output nằm trong `src-tauri/target/release/bundle/` (`.msi`/`.exe` trên Windo
 ```
 src/                     # Frontend React
   components/            # TopBar, ActivityBar, Sidebar, ProjectTree, SearchPanel,
-                         # EditorArea, CodeEditor, BottomPanel, StatusBar,
-                         # WelcomeScreen, QuickOpen, ContextMenu, SettingsDialog
+                         # SourceControlPanel, EditorArea, CodeEditor, BottomPanel,
+                         # StatusBar, WelcomeScreen, QuickOpen, ContextMenu, SettingsDialog
   lib/                   # api.ts (invoke wrappers), store.tsx (state), i18n.tsx (vi/en/zh),
                          # window.ts, editor*
 src-tauri/
   src/
     commands/            # project.rs (workspace + recent), fs.rs (file tree/IO),
-                         # search.rs (search toàn workspace), terminal.rs (shell)
+                         # search.rs (search toàn workspace), terminal.rs (shell),
+                         # git.rs (status/stage/commit/push/pull/branch/diff qua git CLI)
   icons/                 # icon ứng dụng
 ```
 

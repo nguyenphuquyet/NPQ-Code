@@ -1,12 +1,16 @@
 import { useEffect, useRef } from "react";
-import { EditorState, Extension } from "@codemirror/state";
+import { EditorState, Extension, RangeSetBuilder } from "@codemirror/state";
 import {
+  Decoration,
   EditorView,
   drawSelection,
   highlightActiveLine,
   highlightActiveLineGutter,
   keymap,
   lineNumbers,
+  ViewPlugin,
+  type DecorationSet,
+  type ViewUpdate,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import {
@@ -149,10 +153,47 @@ function languageFor(lang: string): Extension {
   }
 }
 
+/** Colours `+`/`-`/`@@` lines in the read-only unified diff tabs. */
+function buildDiffDecorations(view: EditorView): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const { from, to } of view.visibleRanges) {
+    let position = from;
+    while (position <= to) {
+      const line = view.state.doc.lineAt(position);
+      const text = line.text;
+      let className: string | null = null;
+      if (text.startsWith("+++") || text.startsWith("---")) className = "cm-diff-meta";
+      else if (text.startsWith("@@")) className = "cm-diff-hunk";
+      else if (text.startsWith("+")) className = "cm-diff-add";
+      else if (text.startsWith("-")) className = "cm-diff-del";
+      if (className) builder.add(line.from, line.from, Decoration.line({ class: className }));
+      position = line.to + 1;
+    }
+  }
+  return builder.finish();
+}
+
+const diffHighlighting = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = buildDiffDecorations(view);
+    }
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = buildDiffDecorations(update.view);
+      }
+    }
+  },
+  { decorations: (plugin) => plugin.decorations },
+);
+
 type Props = {
   content: string;
   language: string;
   reveal?: RevealTarget | null;
+  readOnly?: boolean;
+  diff?: boolean;
   onChange: (value: string) => void;
   onCursor: (line: number, col: number) => void;
   onSave: () => void;
@@ -162,6 +203,8 @@ export default function CodeEditor({
   content,
   language,
   reveal,
+  readOnly = false,
+  diff = false,
   onChange,
   onCursor,
   onSave,
@@ -216,6 +259,10 @@ export default function CodeEditor({
           indentWithTab,
         ]),
         saveKeymap,
+        ...(readOnly
+          ? [EditorState.readOnly.of(true), EditorView.editable.of(false)]
+          : []),
+        ...(diff ? [diffHighlighting] : []),
         syntaxHighlighting(highlight, { fallback: false }),
         codeTheme,
         languageFor(language),

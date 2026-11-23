@@ -1,8 +1,9 @@
-import { ChevronRight, FileCode2, X } from "lucide-react";
+import { ChevronRight, FileCode2, FileDiff, X } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useStudio } from "../lib/store";
 import { useI18n } from "../lib/i18n";
-import { fileLanguage, relativePath } from "../lib/api";
+import { fileLanguage, fileName, relativePath } from "../lib/api";
+import type { OpenFile } from "../lib/store";
 import CodeEditor from "./CodeEditor";
 import { useContextMenu } from "./ContextMenu";
 import { copyText } from "../lib/clipboard";
@@ -18,7 +19,9 @@ import {
   hasEditorSelection,
 } from "../lib/editorActions";
 
-function tabIcon(name: string) {
+function tabIcon(file: OpenFile) {
+  if (file.diff) return <FileDiff size={13} className="text-vs-green" />;
+  const name = file.name;
   if (name.endsWith(".json")) return <FileCode2 size={13} className="text-vs-yellow" />;
   if (/\.(css|scss|less)$/.test(name)) return <FileCode2 size={13} className="text-vs-orange" />;
   if (/\.(md|txt)$/.test(name)) return <FileCode2 size={13} className="text-vs-dim" />;
@@ -32,7 +35,9 @@ export default function EditorArea() {
   const active = s.openFiles.find((file) => file.path === s.activePath);
 
   const crumbs = active
-    ? relativePath(s.workspace?.path ?? "", active.path).replace(/\\/g, "/").split("/")
+    ? active.diff
+      ? [fileName(active.sourcePath ?? active.path), t("git.diffSuffix")]
+      : relativePath(s.workspace?.path ?? "", active.path).replace(/\\/g, "/").split("/")
     : [];
 
   const onEditorContextMenu = (event: ReactMouseEvent) => {
@@ -94,7 +99,7 @@ export default function EditorArea() {
                   : "border-t-transparent bg-vs-tab text-vs-dim hover:bg-vs-hover"
               }`}
             >
-              {tabIcon(file.name)}
+              {tabIcon(file)}
               <span className="min-w-0 flex-1 truncate">{file.name}</span>
               {file.dirty ? (
                 <span
@@ -144,6 +149,8 @@ export default function EditorArea() {
             key={active.path}
             content={active.content}
             language={fileLanguage(active.path)}
+            readOnly={active.readOnly}
+            diff={active.diff}
             reveal={s.reveal && s.reveal.path === active.path ? s.reveal : null}
             onChange={(value) => s.updateContent(active.path, value)}
             onCursor={(line, col) => s.setCursor(line, col)}
