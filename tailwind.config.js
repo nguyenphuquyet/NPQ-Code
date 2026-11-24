@@ -42,7 +42,13 @@ export default {
       },
       fontFamily: {
         ui: ['"Segoe UI"', '"Inter"', "system-ui", "sans-serif"],
-        mono: ['"Cascadia Code"', '"JetBrains Mono"', '"Fira Code"', "Consolas", "monospace"],
+        mono: [
+          '"JetBrains Mono Variable"',
+          '"JetBrains Mono"',
+          "ui-monospace",
+          "Consolas",
+          "monospace",
+        ],
       },
       fontSize: {
         // rem-based so the UI zoom (--ui-scale) scales these too.

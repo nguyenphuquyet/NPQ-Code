@@ -1,3 +1,5 @@
+@import "@fontsource-variable/jetbrains-mono";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -358,8 +360,19 @@ body,
   box-sizing: border-box;
 }
 
+/*
+ * Selection paints the background only. Setting `color` here would repaint
+ * every selected token in one colour and wipe out the syntax highlighting, so
+ * the editor keeps its token colours inside the selection like VS Code does.
+ * Plain text fields have no token colours, so they still get the themed text
+ * colour for contrast.
+ */
 ::selection {
   background: rgb(var(--vs-selection));
+}
+
+input::selection,
+textarea::selection {
   color: rgb(var(--vs-selection-text));
 }
 
@@ -385,19 +398,33 @@ body,
   background: transparent;
 }
 
-/* CodeMirror shell; colours come from the CSS variables in CodeEditor.tsx. */
+/*
+ * Editor text metrics mirror QChat IDE, whose Monaco instance renders at
+ * 13px with 18px lines (Monaco computes `round(1.35 * fontSize)` on Windows)
+ * in JetBrains Mono. The font ships with the app, so the editor looks the same
+ * on machines without it installed.
+ *
+ * `--ui-scale` is 1.1 by default here, so both values are anchored at that
+ * default: the editor matches QChat exactly as the app opens, and the zoom
+ * commands still scale the code with the rest of the shell.
+ */
 .cm-editor {
   height: 100%;
-  font-family: "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, monospace;
-  font-size: 0.8125rem;
-  line-height: 1.6;
+  font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace,
+    SFMono-Regular, Consolas, monospace;
+  font-size: calc(13px * var(--ui-scale, 1.1) / 1.1);
+  line-height: calc(18px * var(--ui-scale, 1.1) / 1.1);
 }
 .cm-editor .cm-scroller {
   font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
   overflow: auto;
 }
 .cm-editor .cm-gutters {
   font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 /* Unified diff tab: tint whole lines, similar to VS Code's diff editor. */
