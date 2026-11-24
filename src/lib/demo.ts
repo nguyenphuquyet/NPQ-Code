@@ -81,6 +81,61 @@ addFile("src/styles.css", [
   "}",
 ]);
 
+addFile("src/utils.py", [
+  "from dataclasses import dataclass",
+  "",
+  "",
+  "@dataclass",
+  "class Release:",
+  "    name: str",
+  "    files: list[str]",
+  "",
+  "    def summary(self) -> str:",
+  '        return f"{self.name}: {len(self.files)} files"',
+  "",
+  "",
+  "def chunk(items: list[str], size: int = 10) -> list[list[str]]:",
+  "    return [items[i : i + size] for i in range(0, len(items), size)]",
+]);
+
+addFile("infra/deploy.yaml", [
+  "name: npq-code",
+  "on:",
+  "  push:",
+  "    branches: [main]",
+  "jobs:",
+  "  build:",
+  "    runs-on: windows-latest",
+  "    steps:",
+  "      - uses: actions/checkout@v4",
+  "      - run: npm ci && npm run build",
+  "        env:",
+  "          NODE_ENV: production",
+]);
+
+addFile("scripts/release.sh", [
+  "#!/usr/bin/env bash",
+  "set -euo pipefail",
+  "",
+  'VERSION="${1:-1.0.0}"',
+  'echo "Building NPQ Code $VERSION"',
+  'npm run build -- --mode production',
+  'git tag -a "v$VERSION" -m "Release $VERSION"',
+]);
+
+addFile("Dockerfile", [
+  "FROM node:20-alpine AS build",
+  "WORKDIR /app",
+  "COPY package*.json ./",
+  "RUN npm ci",
+  "COPY . .",
+  "RUN npm run build",
+  "",
+  "FROM nginx:alpine",
+  "COPY --from=build /app/dist /usr/share/nginx/html",
+  "EXPOSE 80",
+]);
+
 addFile("package.json", [
   "{",
   '  "name": "npq-code-demo",',

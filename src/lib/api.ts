@@ -93,6 +93,31 @@ export type EditorLanguage =
   | "json"
   | "html"
   | "css"
+  | "scss"
+  | "less"
+  | "python"
+  | "rust"
+  | "go"
+  | "c"
+  | "cpp"
+  | "csharp"
+  | "java"
+  | "kotlin"
+  | "scala"
+  | "dart"
+  | "php"
+  | "ruby"
+  | "lua"
+  | "sql"
+  | "yaml"
+  | "markdown"
+  | "xml"
+  | "shell"
+  | "toml"
+  | "powershell"
+  | "dockerfile"
+  | "ini"
+  | "diff"
   | "text";
 
 const tauriApi = {
@@ -156,16 +181,70 @@ const LANGUAGE_BY_EXTENSION: Record<string, EditorLanguage> = {
   jsonc: "json",
   html: "html",
   htm: "html",
-  xml: "html",
-  svg: "html",
   css: "css",
-  scss: "css",
-  sass: "css",
-  less: "css",
+  scss: "scss",
+  sass: "scss",
+  less: "less",
+  xml: "xml",
+  xsl: "xml",
+  xslt: "xml",
+  svg: "xml",
+  plist: "xml",
+  py: "python",
+  pyw: "python",
+  pyi: "python",
+  rs: "rust",
+  go: "go",
+  c: "c",
+  h: "c",
+  cpp: "cpp",
+  cxx: "cpp",
+  cc: "cpp",
+  hpp: "cpp",
+  hxx: "cpp",
+  hh: "cpp",
+  cs: "csharp",
+  java: "java",
+  kt: "kotlin",
+  kts: "kotlin",
+  scala: "scala",
+  sc: "scala",
+  dart: "dart",
+  php: "php",
+  phtml: "php",
+  rb: "ruby",
+  rake: "ruby",
+  gemspec: "ruby",
+  lua: "lua",
+  sql: "sql",
+  yml: "yaml",
+  yaml: "yaml",
+  md: "markdown",
+  markdown: "markdown",
+  sh: "shell",
+  bash: "shell",
+  zsh: "shell",
+  ksh: "shell",
+  toml: "toml",
+  ps1: "powershell",
+  psm1: "powershell",
+  psd1: "powershell",
+  ini: "ini",
+  cfg: "ini",
+  conf: "ini",
+  properties: "ini",
+  env: "ini",
+  diff: "diff",
+  patch: "diff",
 };
 
 export function fileLanguage(path: string): EditorLanguage {
-  const extension = path.split(".").pop()?.toLowerCase() ?? "";
+  const name = fileName(path).toLowerCase();
+  if (name === "dockerfile" || name.startsWith("dockerfile.") || name === "containerfile") {
+    return "dockerfile";
+  }
+  if (name === ".env" || name.startsWith(".env.")) return "ini";
+  const extension = name.split(".").pop() ?? "";
   return LANGUAGE_BY_EXTENSION[extension] ?? "text";
 }
 

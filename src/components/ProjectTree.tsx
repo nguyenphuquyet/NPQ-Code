@@ -25,13 +25,25 @@ import { copyText } from "../lib/clipboard";
 
 function fileIcon(name: string) {
   const lower = name.toLowerCase();
+  if (lower === "dockerfile" || lower.startsWith("dockerfile.")) {
+    return <FileCode2 size={14} className="text-vs-blue" />;
+  }
   if (/\.(tsx?|jsx?|mjs|cjs|mts|cts)$/.test(lower)) {
     return <FileCode2 size={14} className="text-vs-blue" />;
   }
   if (/\.jsonc?$/.test(lower)) return <Braces size={14} className="text-vs-yellow" />;
   if (/\.(css|scss|sass|less)$/.test(lower)) return <Palette size={14} className="text-vs-orange" />;
-  if (/\.(html?|xml|svg)$/.test(lower)) return <Globe size={14} className="text-vs-orange" />;
+  if (/\.(html?|xml|svg|xsl|xslt)$/.test(lower)) return <Globe size={14} className="text-vs-orange" />;
   if (/\.(md|markdown|txt)$/.test(lower)) return <ScrollText size={14} className="text-vs-dim" />;
+  if (/\.(py|pyw|pyi|rb|rake|gemspec|php|sh|bash|zsh|ksh)$/.test(lower)) {
+    return <FileCode2 size={14} className="text-vs-green" />;
+  }
+  if (/\.(rs|c|cpp|cxx|cc|h|hpp|hxx|hh|cs|java|kt|kts|scala|dart|go|lua|sql)$/.test(lower)) {
+    return <FileCode2 size={14} className="text-vs-orange" />;
+  }
+  if (/\.(ya?ml|toml|ini|cfg|conf|env|properties|ps1|psm1|psd1)$/.test(lower)) {
+    return <FileCode2 size={14} className="text-vs-purple" />;
+  }
   if (/\.(png|jpe?g|gif|webp|ico|bmp)$/.test(lower)) {
     return <ImageIcon size={14} className="text-vs-purple" />;
   }

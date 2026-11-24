@@ -17,12 +17,34 @@ import {
   bracketMatching,
   HighlightStyle,
   indentOnInput,
+  StreamLanguage,
   syntaxHighlighting,
 } from "@codemirror/language";
 import { javascript } from "@codemirror/lang-javascript";
 import { json } from "@codemirror/lang-json";
 import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
+import { python } from "@codemirror/lang-python";
+import { rust } from "@codemirror/lang-rust";
+import { go } from "@codemirror/lang-go";
+import { cpp } from "@codemirror/lang-cpp";
+import { java } from "@codemirror/lang-java";
+import { php } from "@codemirror/lang-php";
+import { yaml } from "@codemirror/lang-yaml";
+import { markdown } from "@codemirror/lang-markdown";
+import { sql } from "@codemirror/lang-sql";
+import { xml } from "@codemirror/lang-xml";
+import { less } from "@codemirror/lang-less";
+import { sass } from "@codemirror/lang-sass";
+import { csharp, dart, kotlin, scala } from "@codemirror/legacy-modes/mode/clike";
+import { shell } from "@codemirror/legacy-modes/mode/shell";
+import { toml } from "@codemirror/legacy-modes/mode/toml";
+import { ruby } from "@codemirror/legacy-modes/mode/ruby";
+import { powerShell } from "@codemirror/legacy-modes/mode/powershell";
+import { dockerFile } from "@codemirror/legacy-modes/mode/dockerfile";
+import { properties } from "@codemirror/legacy-modes/mode/properties";
+import { lua } from "@codemirror/legacy-modes/mode/lua";
+import { diff as diffMode } from "@codemirror/legacy-modes/mode/diff";
 import {
   autocompletion,
   closeBrackets,
@@ -51,8 +73,19 @@ const highlight = HighlightStyle.define([
   { tag: [t.operator, t.punctuation], color: "rgb(var(--syn-operator))" },
   { tag: [t.self, t.namespace], color: "rgb(var(--syn-namespace))" },
   { tag: t.meta, color: "rgb(var(--syn-meta))" },
+  { tag: [t.annotation, t.processingInstruction], color: "rgb(var(--syn-meta))" },
   { tag: t.tagName, color: "rgb(var(--syn-tag))" },
   { tag: t.atom, color: "rgb(var(--syn-atom))" },
+  { tag: [t.macroName, t.standard(t.variableName), t.special(t.variableName)], color: "rgb(var(--syn-function))" },
+  { tag: [t.labelName, t.definition(t.propertyName)], color: "rgb(var(--syn-property))" },
+  { tag: [t.regexp, t.escape, t.special(t.string)], color: "rgb(var(--syn-string))" },
+  {
+    tag: [t.heading1, t.heading2, t.heading3, t.heading4, t.heading5, t.heading6],
+    color: "rgb(var(--syn-type))",
+    fontWeight: "bold",
+  },
+  { tag: t.strikethrough, textDecoration: "line-through" },
+  { tag: t.monospace, fontFamily: "inherit" },
   { tag: t.emphasis, fontStyle: "italic" },
   { tag: t.strong, fontWeight: "bold" },
   { tag: t.link, color: "rgb(var(--syn-link))", textDecoration: "underline" },
@@ -148,6 +181,55 @@ function languageFor(lang: string): Extension {
       return html();
     case "css":
       return css();
+    case "scss":
+      return sass();
+    case "less":
+      return less();
+    case "python":
+      return python();
+    case "rust":
+      return rust();
+    case "go":
+      return go();
+    case "c":
+    case "cpp":
+      return cpp();
+    case "csharp":
+      return StreamLanguage.define(csharp);
+    case "java":
+      return java();
+    case "kotlin":
+      return StreamLanguage.define(kotlin);
+    case "scala":
+      return StreamLanguage.define(scala);
+    case "dart":
+      return StreamLanguage.define(dart);
+    case "php":
+      return php();
+    case "ruby":
+      return StreamLanguage.define(ruby);
+    case "lua":
+      return StreamLanguage.define(lua);
+    case "sql":
+      return sql();
+    case "yaml":
+      return yaml();
+    case "markdown":
+      return markdown();
+    case "xml":
+      return xml();
+    case "shell":
+      return StreamLanguage.define(shell);
+    case "toml":
+      return StreamLanguage.define(toml);
+    case "powershell":
+      return StreamLanguage.define(powerShell);
+    case "dockerfile":
+      return StreamLanguage.define(dockerFile);
+    case "ini":
+      return StreamLanguage.define(properties);
+    case "diff":
+      return StreamLanguage.define(diffMode);
     default:
       return [];
   }

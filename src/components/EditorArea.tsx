@@ -21,10 +21,29 @@ import {
 
 function tabIcon(file: OpenFile) {
   if (file.diff) return <FileDiff size={13} className="text-vs-green" />;
-  const name = file.name;
-  if (name.endsWith(".json")) return <FileCode2 size={13} className="text-vs-yellow" />;
-  if (/\.(css|scss|less)$/.test(name)) return <FileCode2 size={13} className="text-vs-orange" />;
-  if (/\.(md|txt)$/.test(name)) return <FileCode2 size={13} className="text-vs-dim" />;
+  const name = file.name.toLowerCase();
+  if (name === "dockerfile" || name.startsWith("dockerfile.")) {
+    return <FileCode2 size={13} className="text-vs-blue" />;
+  }
+  if (/\.(tsx?|jsx?|mjs|cjs|mts|cts)$/.test(name)) {
+    return <FileCode2 size={13} className="text-vs-blue" />;
+  }
+  if (/\.(json|jsonc)$/.test(name)) return <FileCode2 size={13} className="text-vs-yellow" />;
+  if (/\.(css|scss|sass|less)$/.test(name)) return <FileCode2 size={13} className="text-vs-orange" />;
+  if (/\.(html?|xml|svg|xsl|xslt)$/.test(name)) return <FileCode2 size={13} className="text-vs-orange" />;
+  if (/\.(md|markdown|txt)$/.test(name)) return <FileCode2 size={13} className="text-vs-dim" />;
+  if (/\.(py|pyw|pyi|rb|rake|gemspec|php)$/.test(name)) {
+    return <FileCode2 size={13} className="text-vs-green" />;
+  }
+  if (/\.(rs|c|cpp|cxx|cc|h|hpp|hxx|hh|cs|java|kt|kts|scala|dart|go|lua)$/.test(name)) {
+    return <FileCode2 size={13} className="text-vs-orange" />;
+  }
+  if (/\.(ya?ml|toml|ini|cfg|conf|env|properties|sql)$/.test(name)) {
+    return <FileCode2 size={13} className="text-vs-purple" />;
+  }
+  if (/\.(sh|bash|zsh|ksh|ps1|psm1|psd1)$/.test(name)) {
+    return <FileCode2 size={13} className="text-vs-green" />;
+  }
   return <FileCode2 size={13} className="text-vs-blue" />;
 }
 
@@ -148,7 +167,7 @@ export default function EditorArea() {
           <CodeEditor
             key={active.path}
             content={active.content}
-            language={fileLanguage(active.path)}
+            language={active.diff ? "text" : fileLanguage(active.path)}
             readOnly={active.readOnly}
             diff={active.diff}
             reveal={s.reveal && s.reveal.path === active.path ? s.reveal : null}
