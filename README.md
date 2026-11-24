@@ -16,6 +16,7 @@ Backend: **Tauri v2** (Rust).
 - **Giao diện & chủ đề**: thanh trạng thái kiểu VS Code, bảng màu phẳng không gradient; 4 chủ đề **Light+** (mặc định), **Dark+**, **High Contrast**, **Solarized Light** — đổi trong **Cài đặt**, áp dụng ngay và được ghi nhớ.
 - **Đa ngôn ngữ**: Tiếng Việt, English, 中文 — đổi ngay trong **Cài đặt** (biểu tượng bánh răng ở thanh bên hoặc menu **Trợ giúp → Cài đặt**), lựa chọn được ghi nhớ.
 - **Recent folders**: mở lại workspace gần đây từ màn hình Welcome.
+- **Khôi phục phiên làm việc**: tự mở lại thư mục, các tab đang mở (kể cả buffer chưa lưu), trạng thái mở/đóng của cây thư mục, panel đang xem và kích thước panel sau khi tắt/mở lại app.
 - **Zoom giao diện**: `Ctrl+=`, `Ctrl+-`, `Ctrl+0`.
 
 ## Phím tắt

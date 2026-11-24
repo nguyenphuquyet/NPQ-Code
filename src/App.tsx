@@ -11,11 +11,45 @@ import WelcomeScreen from "./components/WelcomeScreen";
 import QuickOpen from "./components/QuickOpen";
 import SettingsDialog from "./components/SettingsDialog";
 
+const LAYOUT_KEY = "npqcode.layout";
+
+type StoredLayout = { leftWidth?: number; bottomHeight?: number };
+
+function readLayout(): StoredLayout {
+  try {
+    const raw = window.localStorage.getItem(LAYOUT_KEY);
+    if (!raw) return {};
+    const data = JSON.parse(raw) as StoredLayout | null;
+    return data && typeof data === "object" ? data : {};
+  } catch {
+    return {};
+  }
+}
+
+function clampLayout(value: unknown, min: number, max: number, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(min, Math.min(max, value))
+    : fallback;
+}
+
 export default function App() {
   const s = useStudio();
-  const [leftWidth, setLeftWidth] = useState(260);
-  const [bottomHeight, setBottomHeight] = useState(240);
+  const [leftWidth, setLeftWidth] = useState(() =>
+    clampLayout(readLayout().leftWidth, 180, 520, 260),
+  );
+  const [bottomHeight, setBottomHeight] = useState(() =>
+    clampLayout(readLayout().bottomHeight, 120, 560, 240),
+  );
   const dragging = useRef<null | "left" | "bottom">(null);
+
+  // Panel sizes survive a restart, like the rest of the session.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LAYOUT_KEY, JSON.stringify({ leftWidth, bottomHeight }));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [leftWidth, bottomHeight]);
 
   // "Open Folder" from the menu / welcome screen.
   useEffect(() => {

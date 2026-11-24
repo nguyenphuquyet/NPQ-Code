@@ -83,6 +83,75 @@ function readStoredScale() {
   return UI_SCALE_DEFAULT;
 }
 
+/*
+ * Session restore: the folder, open tabs, unsaved buffers and layout survive a
+ * restart. Tree expansion is stored per workspace by `ProjectTree` itself.
+ */
+const SESSION_KEY = "npqcode.session";
+const SESSION_VERSION = 1;
+const SIDEBAR_VIEWS: SidebarView[] = ["explorer", "search", "git", "extensions"];
+const BOTTOM_TABS: BottomTab[] = ["problems", "output", "terminal"];
+
+type StoredOpenFile = {
+  path: string;
+  dirty: boolean;
+  /** Only kept for unsaved buffers, so a clean tab reloads from disk. */
+  content?: string;
+};
+
+type StoredSession = {
+  version: number;
+  workspace: string | null;
+  activePath: string | null;
+  openFiles: StoredOpenFile[];
+  sidebarView: SidebarView;
+  sidebarVisible: boolean;
+  bottomVisible: boolean;
+  bottomTab: BottomTab;
+};
+
+function readStoredSession(): StoredSession | null {
+  try {
+    const raw = window.localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as Record<string, unknown> | null;
+    if (!data || data.version !== SESSION_VERSION) return null;
+
+    const rawFiles = data.openFiles;
+    const openFiles: StoredOpenFile[] = Array.isArray(rawFiles)
+      ? rawFiles.flatMap((item) => {
+          if (!item || typeof item !== "object") return [];
+          const record = item as Record<string, unknown>;
+          if (typeof record.path !== "string" || typeof record.dirty !== "boolean") return [];
+          return [
+            {
+              path: record.path,
+              dirty: record.dirty,
+              content: typeof record.content === "string" ? record.content : undefined,
+            },
+          ];
+        })
+      : [];
+
+    return {
+      version: SESSION_VERSION,
+      workspace: typeof data.workspace === "string" && data.workspace ? data.workspace : null,
+      activePath: typeof data.activePath === "string" ? data.activePath : null,
+      openFiles,
+      sidebarView: SIDEBAR_VIEWS.includes(data.sidebarView as SidebarView)
+        ? (data.sidebarView as SidebarView)
+        : "explorer",
+      sidebarVisible: data.sidebarVisible !== false,
+      bottomVisible: data.bottomVisible === true,
+      bottomTab: BOTTOM_TABS.includes(data.bottomTab as BottomTab)
+        ? (data.bottomTab as BottomTab)
+        : "terminal",
+    };
+  } catch {
+    return null;
+  }
+}
+
 function joinPath(dir: string, name: string) {
   return dir.replace(/[\\/]+$/, "") + "/" + name;
 }
@@ -205,10 +274,12 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     busy: false,
     error: null,
   });
+  const [sessionReady, setSessionReady] = useState(false);
   const toastTimer = useRef<number | null>(null);
   const searchSeq = useRef(0);
   const gitSeq = useRef(0);
   const revealSeq = useRef(0);
+  const sessionRef = useRef<string | null>(null);
   const finishedCommands = useRef<Set<number>>(new Set());
 
   // Apply + persist the UI zoom. `--ui-scale` is consumed by `html` in index.css.
@@ -292,6 +363,8 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       setGit((prev) => ({ ...prev, busy: true }));
       try {
         await action(root);
+        // Checkout / pull / discard can add or remove files on disk.
+        api.listTree(workspace.path).then(setTree).catch(() => {});
         await refreshGitFor(root);
         if (success) showToast(success);
         return true;
@@ -416,10 +489,16 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!workspace) return;
-    const onFocus = () => void refreshGitFor(workspace.path);
+    const onFocus = () => {
+      void refreshGitFor(workspace.path);
+      // Pick up files created/removed while the app was in the background.
+      if (sidebarView === "explorer") {
+        api.listTree(workspace.path).then(setTree).catch(() => {});
+      }
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [refreshGitFor, workspace]);
+  }, [refreshGitFor, sidebarView, workspace]);
 
   const loadRecent = useCallback(() => {
     api.recentWorkspaces().then(setRecent).catch(() => {});
@@ -460,6 +539,139 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loadRecent, t]);
 
+  // Restore the last session once per launch. The snapshot is read
+  // synchronously, so the Welcome screen only shows when there is nothing to
+  // restore (first run, or the folder was removed since).
+  useEffect(() => {
+    const session = readStoredSession();
+    const workspacePath = session?.workspace;
+    if (!session || !workspacePath) {
+      setSessionReady(true);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const info = await api.openWorkspace(workspacePath);
+        if (cancelled) return;
+        const nextTree = await api.listTree(info.path).catch(() => null);
+        if (cancelled) return;
+
+        const restored: OpenFile[] = [];
+        for (const stored of session.openFiles) {
+          if (stored.dirty && stored.content !== undefined) {
+            restored.push({
+              path: stored.path,
+              name: fileName(stored.path),
+              language: fileLanguage(stored.path),
+              content: stored.content,
+              dirty: true,
+            });
+            continue;
+          }
+          try {
+            const content = await api.readFile(stored.path);
+            if (cancelled) return;
+            restored.push({
+              path: stored.path,
+              name: fileName(stored.path),
+              language: fileLanguage(stored.path),
+              content,
+              dirty: false,
+            });
+          } catch {
+            /* file was removed since the last run */
+          }
+        }
+        if (cancelled) return;
+
+        setWorkspace(info);
+        setTree(nextTree);
+        setOpenFiles(restored);
+        setActivePath(
+          restored.some((file) => file.path === session.activePath)
+            ? session.activePath
+            : restored[0]?.path ?? null,
+        );
+        setSidebarView(session.sidebarView);
+        setSidebarVisible(session.sidebarVisible);
+        setBottomVisible(session.bottomVisible);
+        setBottomTab(session.bottomTab);
+        void refreshGitFor(info.path);
+      } catch {
+        /* the folder no longer exists: keep the Welcome screen */
+      } finally {
+        if (!cancelled) setSessionReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist the session (debounced) and flush it on window close, so a restart
+  // resumes the same folder, tabs, unsaved buffers and layout.
+  useEffect(() => {
+    if (!sessionReady) return;
+    const session: StoredSession = {
+      version: SESSION_VERSION,
+      workspace: workspace?.path ?? null,
+      activePath,
+      openFiles: openFiles
+        .filter((file) => !file.readOnly)
+        .map((file) =>
+          file.dirty
+            ? { path: file.path, dirty: true, content: file.content }
+            : { path: file.path, dirty: false },
+        ),
+      sidebarView,
+      sidebarVisible,
+      bottomVisible,
+      bottomTab,
+    };
+    sessionRef.current = JSON.stringify(session);
+    const timer = window.setTimeout(() => {
+      const value = sessionRef.current;
+      if (!value) return;
+      try {
+        window.localStorage.setItem(SESSION_KEY, value);
+      } catch {
+        /* quota exceeded: keep the previous snapshot */
+      }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [
+    activePath,
+    bottomTab,
+    bottomVisible,
+    openFiles,
+    sessionReady,
+    sidebarView,
+    sidebarVisible,
+    workspace,
+  ]);
+
+  useEffect(() => {
+    const flush = () => {
+      const value = sessionRef.current;
+      if (!value) return;
+      try {
+        window.localStorage.setItem(SESSION_KEY, value);
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", flush);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", flush);
+    };
+  }, []);
+
   const refreshTree = useCallback(() => {
     if (!workspace) return;
     api
@@ -468,6 +680,13 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       .catch((error) => showToast(String(error)));
     void refreshGit();
   }, [workspace, showToast, refreshGit]);
+
+  // Re-read the tree whenever the Explorer becomes visible so the sidebar does
+  // not show a stale picture after external changes.
+  useEffect(() => {
+    if (workspace && sidebarView === "explorer") refreshTree();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sidebarView, workspace?.path]);
 
   const openFile = useCallback(
     async (path: string) => {

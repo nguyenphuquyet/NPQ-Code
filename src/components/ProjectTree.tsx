@@ -42,6 +42,37 @@ function parentDir(path: string) {
   return path.replace(/[\\/][^\\/]+$/, "");
 }
 
+/*
+ * Explorer expansion is remembered per workspace, so closing and reopening the
+ * app restores the same tree shape.
+ */
+const EXPANDED_PREFIX = "npqcode.tree.expanded:";
+
+function readExpanded(workspacePath: string | undefined): Set<string> {
+  if (!workspacePath) return new Set();
+  try {
+    const raw = window.localStorage.getItem(EXPANDED_PREFIX + workspacePath);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === "string")
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function saveExpanded(workspacePath: string | undefined, expanded: Set<string>) {
+  if (!workspacePath) return;
+  try {
+    window.localStorage.setItem(EXPANDED_PREFIX + workspacePath, JSON.stringify([...expanded]));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 type TreeProps = {
   node: FileNode;
   depth: number;
@@ -152,11 +183,11 @@ function TreeNode({ node, depth, expanded, toggle }: TreeProps) {
       className={`flex w-full items-center gap-1 py-[3px] pr-2 text-left hover:bg-vs-hover ${
         isActive ? "bg-vs-select" : ""
       }`}
-      style={{ paddingLeft: 20 + depth * 12 }}
+      style={{ paddingLeft: 8 + depth * 12 }}
       onClick={() => void s.openFile(node.path)}
       onContextMenu={onContextMenu}
     >
-      <span className="w-3 shrink-0" />
+      <span className="shrink-0" style={{ width: 12 }} />
       {fileIcon(node.name)}
       <span
         className={`truncate text-2xs ${
@@ -173,20 +204,27 @@ function TreeNode({ node, depth, expanded, toggle }: TreeProps) {
 export default function ProjectTree() {
   const s = useStudio();
   const { t } = useI18n();
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const workspacePath = s.workspace?.path;
+  const [expanded, setExpanded] = useState<Set<string>>(() => readExpanded(workspacePath));
 
-  // A new folder starts collapsed, like a fresh Explorer.
+  // Load the remembered expansion for this folder (or start collapsed).
   useEffect(() => {
-    setExpanded(new Set());
-  }, [s.workspace?.path]);
+    setExpanded(readExpanded(workspacePath));
+  }, [workspacePath]);
 
   const toggle = (path: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path);
       else next.add(path);
+      saveExpanded(workspacePath, next);
       return next;
     });
+  };
+
+  const collapseAll = () => {
+    setExpanded(new Set());
+    saveExpanded(workspacePath, new Set());
   };
 
   const createAtRoot = async (kind: "file" | "folder") => {
@@ -246,7 +284,7 @@ export default function ProjectTree() {
         <button
           className="grid h-5 w-5 place-items-center rounded hover:bg-vs-hover"
           title={t("explorer.collapseAll")}
-          onClick={() => setExpanded(new Set())}
+          onClick={collapseAll}
         >
           <ChevronRight size={12} />
         </button>
