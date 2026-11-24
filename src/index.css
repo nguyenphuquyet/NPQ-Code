@@ -43,7 +43,14 @@
   --vs-input: 255 255 255;
   --vs-badge: 225 225 225;
   --vs-highlight: 255 233 168;
-  --vs-selection: 173 214 255;
+  /*
+   * 60% of #add6ff over the white editor (173 214 255 -> 206 230 255). An
+   * opaque #add6ff drowns the 13px token colours, so a selection reads as one
+   * flat colour; the lighter tint keeps keyword/string/number legible.
+   * Pre-blended rather than alpha on purpose: CodeMirror paints the selection
+   * layer and the native ::selection, and two translucent layers would stack.
+   */
+  --vs-selection: 206 230 255;
   --vs-selection-text: 31 31 31;
   --vs-scrollbar: 200 200 200;
   --vs-scrollbar-hover: 168 168 168;
@@ -51,7 +58,7 @@
   --cm-bg: 255 255 255;
   --cm-fg: 31 31 31;
   --cm-caret: 0 0 0;
-  --cm-selection: 173 214 255;
+  --cm-selection: 206 230 255;
   --cm-selection-match: 201 228 251;
   /* Overlay (not a solid fill): the active line sits above the selection layer. */
   --cm-active-line: 0 0 0;
