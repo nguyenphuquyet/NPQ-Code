@@ -5,6 +5,8 @@ import {
   Eraser,
   FolderOpen,
   MinusSquare,
+  PanelBottom,
+  PanelLeft,
   Redo2,
   Save,
   SaveAll,
@@ -288,6 +290,23 @@ export default function TopBar() {
         </button>
       </div>
 
+      <div className="no-drag flex items-center gap-0.5 pr-1.5">
+        <LayoutButton
+          active={s.sidebarVisible}
+          title={t("topbar.toggleSidebar")}
+          onClick={() => s.toggleSidebar()}
+        >
+          <PanelLeft size={14} />
+        </LayoutButton>
+        <LayoutButton
+          active={s.bottomVisible}
+          title={t("topbar.togglePanel")}
+          onClick={() => s.setBottomVisible(!s.bottomVisible)}
+        >
+          <PanelBottom size={14} />
+        </LayoutButton>
+      </div>
+
       <div className="no-drag flex items-stretch">
         <button
           onClick={() => winAction("minimize")}
@@ -312,6 +331,36 @@ export default function TopBar() {
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Layout toggles on the right of the title bar (sidebar, bottom panel), the
+ * same spot VS Code and QChat IDE put them.
+ */
+function LayoutButton({
+  active,
+  title,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  title: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      aria-pressed={active}
+      className={`grid h-6 w-6 place-items-center rounded-[3px] ${
+        active ? "bg-vs-select text-vs-strong" : "text-vs-text hover:bg-vs-titlebarHover"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

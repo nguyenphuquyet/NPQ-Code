@@ -172,7 +172,7 @@ export default function CodeEditor({
         scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
         overviewRulerBorder: false,
         hideCursorInOverviewRuler: true,
-        contextmenu: true,
+        contextmenu: false,
         quickSuggestions: true,
         readOnly,
         domReadOnly: readOnly,
