@@ -41,7 +41,7 @@ export default function ActivityBar() {
             }`}
           >
             {active && <span className="absolute left-0 h-full w-0.5 bg-vs-accent" />}
-            <view.icon size={20} />
+            <view.icon size={23} strokeWidth={1.9} />
             {view.id === "git" && gitCount > 0 && (
               <span className="absolute bottom-0.5 right-1 min-w-[16px] rounded-full bg-vs-accent px-1 text-center text-[9px] font-semibold leading-[14px] text-white">
                 {gitCount > 99 ? "99+" : gitCount}
@@ -56,14 +56,14 @@ export default function ActivityBar() {
         onClick={() => s.showToast(t("activity.infoMessage"))}
         className="mb-1 grid h-9 w-full place-items-center text-vs-dim hover:text-vs-strong"
       >
-        <Info size={19} />
+        <Info size={22} strokeWidth={1.9} />
       </button>
       <button
         title={t("activity.settings")}
         onClick={() => s.setSettingsOpen(true)}
         className="mb-1 grid h-9 w-full place-items-center text-vs-dim hover:text-vs-strong"
       >
-        <Settings size={19} />
+        <Settings size={22} strokeWidth={1.9} />
       </button>
     </div>
   );
