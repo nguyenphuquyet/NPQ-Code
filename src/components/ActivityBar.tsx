@@ -28,7 +28,7 @@ export default function ActivityBar() {
   };
 
   return (
-    <div className="flex w-10 shrink-0 flex-col items-center border-r border-vs-border bg-vs-activity py-1">
+    <div className="flex w-11 shrink-0 flex-col items-center border-r border-vs-border bg-vs-activity py-1">
       {VIEWS.map((view) => {
         const active = s.sidebarVisible && s.sidebarView === view.id;
         return (
@@ -41,9 +41,9 @@ export default function ActivityBar() {
             }`}
           >
             {active && <span className="absolute left-0 h-full w-0.5 bg-vs-accent" />}
-            <view.icon size={19} />
+            <view.icon size={20} />
             {view.id === "git" && gitCount > 0 && (
-              <span className="absolute bottom-0.5 right-1 min-w-[15px] rounded-full bg-vs-accent px-1 text-center text-[9px] font-semibold leading-[14px] text-white">
+              <span className="absolute bottom-0.5 right-1 min-w-[16px] rounded-full bg-vs-accent px-1 text-center text-[9px] font-semibold leading-[14px] text-white">
                 {gitCount > 99 ? "99+" : gitCount}
               </span>
             )}
@@ -56,14 +56,14 @@ export default function ActivityBar() {
         onClick={() => s.showToast(t("activity.infoMessage"))}
         className="mb-1 grid h-9 w-full place-items-center text-vs-dim hover:text-vs-strong"
       >
-        <Info size={18} />
+        <Info size={19} />
       </button>
       <button
         title={t("activity.settings")}
         onClick={() => s.setSettingsOpen(true)}
         className="mb-1 grid h-9 w-full place-items-center text-vs-dim hover:text-vs-strong"
       >
-        <Settings size={18} />
+        <Settings size={19} />
       </button>
     </div>
   );

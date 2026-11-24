@@ -11,7 +11,13 @@ import WelcomeScreen from "./components/WelcomeScreen";
 import QuickOpen from "./components/QuickOpen";
 import SettingsDialog from "./components/SettingsDialog";
 
-const LAYOUT_KEY = "npqcode.layout";
+// Bumped when the default panel sizes change so a stored layout from an older
+// build does not pin the old size.
+const LAYOUT_KEY = "npqcode.layout.v3";
+
+const LEFT_MIN = 180;
+const LEFT_MAX = 520;
+const LEFT_DEFAULT = 260;
 
 type StoredLayout = { leftWidth?: number; bottomHeight?: number };
 
@@ -35,12 +41,15 @@ function clampLayout(value: unknown, min: number, max: number, fallback: number)
 export default function App() {
   const s = useStudio();
   const [leftWidth, setLeftWidth] = useState(() =>
-    clampLayout(readLayout().leftWidth, 180, 520, 260),
+    clampLayout(readLayout().leftWidth, LEFT_MIN, LEFT_MAX, LEFT_DEFAULT),
   );
   const [bottomHeight, setBottomHeight] = useState(() =>
     clampLayout(readLayout().bottomHeight, 120, 560, 240),
   );
   const dragging = useRef<null | "left" | "bottom">(null);
+  // Distance between the pointer and the sidebar's left edge, captured on
+  // mouse-down so the divider tracks the cursor exactly.
+  const dragOffset = useRef(0);
 
   // Panel sizes survive a restart, like the rest of the session.
   useEffect(() => {
@@ -66,7 +75,9 @@ export default function App() {
     const onMove = (event: MouseEvent) => {
       if (!dragging.current) return;
       if (dragging.current === "left") {
-        setLeftWidth(Math.max(180, Math.min(520, event.clientX - 40)));
+        setLeftWidth(
+          Math.max(LEFT_MIN, Math.min(LEFT_MAX, event.clientX - dragOffset.current)),
+        );
       }
       if (dragging.current === "bottom") {
         setBottomHeight(Math.max(120, Math.min(560, window.innerHeight - event.clientY - 24)));
@@ -102,7 +113,10 @@ export default function App() {
               </div>
               <div
                 className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-vs-accent/40"
-                onMouseDown={() => (dragging.current = "left")}
+                onMouseDown={(event) => {
+                  dragging.current = "left";
+                  dragOffset.current = event.clientX - leftWidth;
+                }}
               />
             </>
           )}

@@ -207,6 +207,7 @@ export default function EditorArea() {
               <div className="min-h-0 flex-1">
                 <CodeEditor
                   key={active.path}
+                  path={active.sourcePath ?? active.path}
                   content={active.content}
                   language={
                     active.diff ? "text" : fileLanguage(active.sourcePath ?? active.path)

@@ -1,278 +1,17 @@
-import { useEffect, useRef } from "react";
-import { EditorState, Extension, RangeSetBuilder } from "@codemirror/state";
-import {
-  Decoration,
-  EditorView,
-  drawSelection,
-  highlightActiveLine,
-  highlightActiveLineGutter,
-  keymap,
-  lineNumbers,
-  ViewPlugin,
-  type DecorationSet,
-  type ViewUpdate,
-} from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import {
-  bracketMatching,
-  HighlightStyle,
-  indentOnInput,
-  StreamLanguage,
-  syntaxHighlighting,
-} from "@codemirror/language";
-import { javascript } from "@codemirror/lang-javascript";
-import { json } from "@codemirror/lang-json";
-import { html } from "@codemirror/lang-html";
-import { css } from "@codemirror/lang-css";
-import { python } from "@codemirror/lang-python";
-import { rust } from "@codemirror/lang-rust";
-import { go } from "@codemirror/lang-go";
-import { cpp } from "@codemirror/lang-cpp";
-import { java } from "@codemirror/lang-java";
-import { php } from "@codemirror/lang-php";
-import { yaml } from "@codemirror/lang-yaml";
-import { markdown } from "@codemirror/lang-markdown";
-import { sql } from "@codemirror/lang-sql";
-import { xml } from "@codemirror/lang-xml";
-import { less } from "@codemirror/lang-less";
-import { sass } from "@codemirror/lang-sass";
-import { csharp, dart, kotlin, scala } from "@codemirror/legacy-modes/mode/clike";
-import { shell } from "@codemirror/legacy-modes/mode/shell";
-import { toml } from "@codemirror/legacy-modes/mode/toml";
-import { ruby } from "@codemirror/legacy-modes/mode/ruby";
-import { powerShell } from "@codemirror/legacy-modes/mode/powershell";
-import { dockerFile } from "@codemirror/legacy-modes/mode/dockerfile";
-import { properties } from "@codemirror/legacy-modes/mode/properties";
-import { lua } from "@codemirror/legacy-modes/mode/lua";
-import { diff as diffMode } from "@codemirror/legacy-modes/mode/diff";
-import {
-  autocompletion,
-  closeBrackets,
-  closeBracketsKeymap,
-  completionKeymap,
-} from "@codemirror/autocomplete";
-import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { tags as t } from "@lezer/highlight";
+import { useEffect, useMemo, useRef } from "react";
+import Editor, { type OnMount } from "@monaco-editor/react";
+import type { editor as MonacoEditor } from "monaco-editor";
 import { getActiveEditor, setActiveEditor } from "../lib/editorBridge";
+import { monaco, monacoLanguage, monacoThemeFor } from "../lib/monaco";
+import { useStudio } from "../lib/store";
+import { useTheme } from "../lib/theme";
 import type { RevealTarget } from "../lib/store";
-
-/*
- * CodeMirror colours come from the theme CSS variables in `src/index.css`
- * (`--cm-*` for the editor chrome, `--syn-*` for syntax tokens), so switching
- * theme repaints open editors without reconfiguring any extension.
- */
-const highlight = HighlightStyle.define([
-  { tag: [t.keyword, t.controlKeyword, t.moduleKeyword], color: "rgb(var(--syn-keyword))" },
-  { tag: [t.string, t.special(t.string), t.attributeValue], color: "rgb(var(--syn-string))" },
-  { tag: [t.number, t.bool, t.null], color: "rgb(var(--syn-number))" },
-  { tag: t.comment, color: "rgb(var(--syn-comment))", fontStyle: "italic" },
-  { tag: [t.function(t.variableName), t.function(t.propertyName)], color: "rgb(var(--syn-function))" },
-  { tag: [t.definition(t.variableName), t.variableName], color: "rgb(var(--syn-variable))" },
-  { tag: [t.typeName, t.className, t.definition(t.typeName)], color: "rgb(var(--syn-type))" },
-  { tag: [t.propertyName, t.attributeName], color: "rgb(var(--syn-property))" },
-  { tag: [t.operator, t.punctuation], color: "rgb(var(--syn-operator))" },
-  { tag: [t.self, t.namespace], color: "rgb(var(--syn-namespace))" },
-  { tag: t.meta, color: "rgb(var(--syn-meta))" },
-  { tag: [t.annotation, t.processingInstruction], color: "rgb(var(--syn-meta))" },
-  { tag: t.tagName, color: "rgb(var(--syn-tag))" },
-  { tag: t.atom, color: "rgb(var(--syn-atom))" },
-  { tag: [t.macroName, t.standard(t.variableName), t.special(t.variableName)], color: "rgb(var(--syn-function))" },
-  { tag: [t.labelName, t.definition(t.propertyName)], color: "rgb(var(--syn-property))" },
-  { tag: [t.regexp, t.escape, t.special(t.string)], color: "rgb(var(--syn-string))" },
-  {
-    tag: [t.heading1, t.heading2, t.heading3, t.heading4, t.heading5, t.heading6],
-    color: "rgb(var(--syn-type))",
-    fontWeight: "bold",
-  },
-  { tag: t.strikethrough, textDecoration: "line-through" },
-  { tag: t.monospace, fontFamily: "inherit" },
-  { tag: t.emphasis, fontStyle: "italic" },
-  { tag: t.strong, fontWeight: "bold" },
-  { tag: t.link, color: "rgb(var(--syn-link))", textDecoration: "underline" },
-  { tag: t.invalid, color: "rgb(var(--cm-invalid))" },
-]);
-
-const codeTheme = EditorView.theme(
-  {
-    "&": { backgroundColor: "rgb(var(--cm-bg))", color: "rgb(var(--cm-fg))", height: "100%" },
-    ".cm-content": { caretColor: "rgb(var(--cm-caret))", padding: "8px 0" },
-    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "rgb(var(--cm-caret))" },
-    /*
-     * CodeMirror's base theme ships `&light.cm-focused > .cm-scroller >
-     * .cm-selectionLayer .cm-selectionBackground { background: #d7d4f0 }`.
-     * That selector is 5 classes deep, so a plain `.cm-selectionBackground`
-     * rule loses to it and the editor keeps CodeMirror's pale lavender
-     * selection even in a dark theme. Match its specificity (and add
-     * `.cm-editor`) so the themed variable always wins.
-     */
-    "&.cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, & > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-content ::selection": {
-      backgroundColor: "rgb(var(--cm-selection))",
-    },
-    ".cm-selectionLayer .cm-selectionBackground": {
-      backgroundColor: "rgb(var(--cm-selection))",
-    },
-    ".cm-selectionMatch": { backgroundColor: "rgb(var(--cm-selection-match))" },
-    /*
-     * The active line paints in the line-background layer, which sits above
-     * CodeMirror's selection layer (z-index: -2). A solid fill would hide the
-     * selection on the line that holds the caret, so this must stay a
-     * translucent overlay — CodeMirror's own default uses rgba for this reason.
-     */
-    ".cm-activeLine": {
-      backgroundColor: "rgb(var(--cm-active-line) / var(--cm-active-line-alpha))",
-    },
-    ".cm-gutters": {
-      backgroundColor: "rgb(var(--cm-gutter-bg))",
-      color: "rgb(var(--cm-gutter-fg))",
-      border: "none",
-      borderRight: "1px solid rgb(var(--cm-gutter-border))",
-    },
-    ".cm-activeLineGutter": {
-      backgroundColor: "rgb(var(--cm-active-gutter-bg))",
-      color: "rgb(var(--cm-active-gutter-fg))",
-    },
-    ".cm-foldPlaceholder": {
-      backgroundColor: "rgb(var(--cm-fold-bg))",
-      border: "1px solid rgb(var(--cm-fold-border))",
-      color: "rgb(var(--cm-fold-fg))",
-    },
-    ".cm-tooltip": {
-      backgroundColor: "rgb(var(--cm-tooltip-bg))",
-      border: "1px solid rgb(var(--cm-tooltip-border))",
-      color: "rgb(var(--cm-fg))",
-      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.12)",
-    },
-    ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {
-      backgroundColor: "rgb(var(--cm-accent-soft))",
-      color: "rgb(var(--cm-fg))",
-    },
-    ".cm-matchingBracket": {
-      backgroundColor: "rgb(var(--cm-bracket-bg))",
-      outline: "1px solid rgb(var(--cm-bracket-outline))",
-    },
-    ".cm-nonmatchingBracket": { color: "rgb(var(--cm-invalid))" },
-    ".cm-panels": { backgroundColor: "rgb(var(--cm-panel-bg))", color: "rgb(var(--cm-fg))" },
-    ".cm-panels.cm-panels-top": { borderBottom: "1px solid rgb(var(--cm-panel-border))" },
-    ".cm-panels.cm-panels-bottom": { borderTop: "1px solid rgb(var(--cm-panel-border))" },
-    ".cm-searchMatch": {
-      backgroundColor: "rgb(var(--cm-search-bg))",
-      outline: "1px solid rgb(var(--cm-search-outline))",
-    },
-    ".cm-searchMatch.cm-searchMatch-selected": {
-      backgroundColor: "rgb(var(--cm-search-selected))",
-    },
-  },
-  { dark: false },
-);
-
-function languageFor(lang: string): Extension {
-  switch (lang) {
-    case "tsx":
-      return javascript({ jsx: true, typescript: true });
-    case "ts":
-      return javascript({ typescript: true });
-    case "jsx":
-      return javascript({ jsx: true });
-    case "js":
-      return javascript();
-    case "json":
-      return json();
-    case "html":
-      return html();
-    case "css":
-      return css();
-    case "scss":
-      return sass();
-    case "less":
-      return less();
-    case "python":
-      return python();
-    case "rust":
-      return rust();
-    case "go":
-      return go();
-    case "c":
-    case "cpp":
-      return cpp();
-    case "csharp":
-      return StreamLanguage.define(csharp);
-    case "java":
-      return java();
-    case "kotlin":
-      return StreamLanguage.define(kotlin);
-    case "scala":
-      return StreamLanguage.define(scala);
-    case "dart":
-      return StreamLanguage.define(dart);
-    case "php":
-      return php();
-    case "ruby":
-      return StreamLanguage.define(ruby);
-    case "lua":
-      return StreamLanguage.define(lua);
-    case "sql":
-      return sql();
-    case "yaml":
-      return yaml();
-    case "markdown":
-      return markdown();
-    case "xml":
-      return xml();
-    case "shell":
-      return StreamLanguage.define(shell);
-    case "toml":
-      return StreamLanguage.define(toml);
-    case "powershell":
-      return StreamLanguage.define(powerShell);
-    case "dockerfile":
-      return StreamLanguage.define(dockerFile);
-    case "ini":
-      return StreamLanguage.define(properties);
-    case "diff":
-      return StreamLanguage.define(diffMode);
-    default:
-      return [];
-  }
-}
-
-/** Colours `+`/`-`/`@@` lines in the read-only unified diff tabs. */
-function buildDiffDecorations(view: EditorView): DecorationSet {
-  const builder = new RangeSetBuilder<Decoration>();
-  for (const { from, to } of view.visibleRanges) {
-    let position = from;
-    while (position <= to) {
-      const line = view.state.doc.lineAt(position);
-      const text = line.text;
-      let className: string | null = null;
-      if (text.startsWith("+++") || text.startsWith("---")) className = "cm-diff-meta";
-      else if (text.startsWith("@@")) className = "cm-diff-hunk";
-      else if (text.startsWith("+")) className = "cm-diff-add";
-      else if (text.startsWith("-")) className = "cm-diff-del";
-      if (className) builder.add(line.from, line.from, Decoration.line({ class: className }));
-      position = line.to + 1;
-    }
-  }
-  return builder.finish();
-}
-
-const diffHighlighting = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-    constructor(view: EditorView) {
-      this.decorations = buildDiffDecorations(view);
-    }
-    update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged) {
-        this.decorations = buildDiffDecorations(update.view);
-      }
-    }
-  },
-  { decorations: (plugin) => plugin.decorations },
-);
+import type { EditorLanguage } from "../lib/api";
 
 type Props = {
+  path: string;
   content: string;
-  language: string;
+  language: EditorLanguage;
   reveal?: RevealTarget | null;
   readOnly?: boolean;
   diff?: boolean;
@@ -281,7 +20,14 @@ type Props = {
   onSave: () => void;
 };
 
+/**
+ * Monaco wrapper. The theme comes from `src/lib/monaco.ts`, and the font size
+ * follows the shell zoom: the editor is anchored at 13px/18px when
+ * `--ui-scale` sits at its 1.1 default, exactly like the previous CodeMirror
+ * surface.
+ */
 export default function CodeEditor({
+  path,
   content,
   language,
   reveal,
@@ -291,105 +37,147 @@ export default function CodeEditor({
   onCursor,
   onSave,
 }: Props) {
-  const hostRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
+  const { theme } = useTheme();
+  const studio = useStudio();
+  const uiScale = studio.uiScale;
+  const fontSize = Math.round((13 * uiScale) / 1.1);
+  const lineHeight = Math.round((18 * uiScale) / 1.1);
+
+  const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
+  const decorationsRef = useRef<string[]>([]);
   const onChangeRef = useRef(onChange);
   const onCursorRef = useRef(onCursor);
   const onSaveRef = useRef(onSave);
+  const readOnlyRef = useRef(readOnly);
   onChangeRef.current = onChange;
   onCursorRef.current = onCursor;
   onSaveRef.current = onSave;
+  readOnlyRef.current = readOnly;
+
+  /*
+   * The model URI keeps the real extension so the TypeScript worker picks the
+   * right script kind (JSX is only legal in a `.tsx`/`.jsx` model). Models are
+   * disposed on unmount, so reusing the base name is safe.
+   */
+  const modelPath = useMemo(() => {
+    const name = path.replace(/\\/g, "/").split("/").pop() || "untitled";
+    return `file:///npq/${encodeURIComponent(name)}`;
+  }, [path]);
+
+  const applyDiffDecorations = (editor: MonacoEditor.IStandaloneCodeEditor) => {
+    const model = editor.getModel();
+    if (!model) return;
+    const decorations: MonacoEditor.IModelDeltaDecoration[] = [];
+    for (let lineNumber = 1; lineNumber <= model.getLineCount(); lineNumber += 1) {
+      const text = model.getLineContent(lineNumber);
+      let kind: "add" | "del" | "hunk" | "meta" | null = null;
+      if (text.startsWith("+++") || text.startsWith("---")) kind = "meta";
+      else if (text.startsWith("@@")) kind = "hunk";
+      else if (text.startsWith("+")) kind = "add";
+      else if (text.startsWith("-")) kind = "del";
+      if (!kind) continue;
+      decorations.push({
+        range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+        options: {
+          isWholeLine: true,
+          className: `npq-diff-${kind}`,
+          inlineClassName: kind === "hunk" || kind === "meta" ? `npq-diff-${kind}-text` : undefined,
+        },
+      });
+    }
+    decorationsRef.current = editor.deltaDecorations(decorationsRef.current, decorations);
+  };
+
+  const handleMount: OnMount = (editor) => {
+    editorRef.current = editor;
+    setActiveEditor(editor);
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      onSaveRef.current();
+    });
+    editor.onDidChangeCursorPosition((event) => {
+      onCursorRef.current(event.position.lineNumber, event.position.column);
+    });
+    onCursorRef.current(1, 1);
+    if (diff) applyDiffDecorations(editor);
+    editor.focus();
+  };
 
   useEffect(() => {
-    if (!hostRef.current) return;
-    const saveKeymap = keymap.of([
-      {
-        key: "Mod-s",
-        run: () => {
-          onSaveRef.current();
-          return true;
-        },
-      },
-    ]);
-    const updateListener = EditorView.updateListener.of((update) => {
-      if (update.docChanged) onChangeRef.current(update.state.doc.toString());
-      if (update.selectionSet) {
-        const head = update.state.selection.main.head;
-        const line = update.state.doc.lineAt(head);
-        onCursorRef.current(line.number, head - line.from + 1);
-      }
-    });
-    const state = EditorState.create({
-      doc: content,
-      extensions: [
-        lineNumbers(),
-        highlightActiveLineGutter(),
-        highlightActiveLine(),
-        drawSelection(),
-        history(),
-        indentOnInput(),
-        bracketMatching(),
-        closeBrackets(),
-        autocompletion(),
-        highlightSelectionMatches(),
-        keymap.of([
-          ...closeBracketsKeymap,
-          ...defaultKeymap,
-          ...historyKeymap,
-          ...completionKeymap,
-          ...searchKeymap,
-          indentWithTab,
-        ]),
-        saveKeymap,
-        ...(readOnly
-          ? [EditorState.readOnly.of(true), EditorView.editable.of(false)]
-          : []),
-        ...(diff ? [diffHighlighting] : []),
-        syntaxHighlighting(highlight, { fallback: false }),
-        codeTheme,
-        languageFor(language),
-        updateListener,
-        EditorView.lineWrapping,
-      ],
-    });
-    const view = new EditorView({ state, parent: hostRef.current });
-    viewRef.current = view;
-    setActiveEditor(view);
-    onCursorRef.current(1, 1);
     return () => {
-      if (getActiveEditor() === view) setActiveEditor(null);
-      view.destroy();
-      viewRef.current = null;
+      const editor = editorRef.current;
+      if (editor && getActiveEditor() === editor) setActiveEditor(null);
+      editorRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [language]);
+  }, []);
 
   // Jump to a search result / tree reveal without remounting the editor.
   useEffect(() => {
-    const view = viewRef.current;
-    if (!view || !reveal) return;
-    const lineNumber = Math.min(Math.max(1, reveal.line), view.state.doc.lines);
-    const line = view.state.doc.line(lineNumber);
-    const column = Math.min(Math.max(1, reveal.column), line.length + 1);
-    const position = line.from + column - 1;
-    view.dispatch({
-      selection: { anchor: position },
-      effects: EditorView.scrollIntoView(position, { y: "center" }),
-    });
-    view.focus();
+    const editor = editorRef.current;
+    if (!editor || !reveal) return;
+    const model = editor.getModel();
+    if (!model) return;
+    const lineNumber = Math.min(Math.max(1, reveal.line), model.getLineCount());
+    const column = Math.min(Math.max(1, reveal.column), model.getLineMaxColumn(lineNumber));
+    editor.setPosition({ lineNumber, column });
+    editor.revealLineInCenter(lineNumber);
+    editor.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reveal?.nonce]);
 
   // Read-only documents (git diffs) can be refreshed in place when the panel
-  // re-opens them, so mirror prop updates into the existing document.
+  // re-opens them, so mirror prop updates into the existing model.
   useEffect(() => {
-    const view = viewRef.current;
-    if (!view || !readOnly) return;
-    if (view.state.doc.toString() === content) return;
-    view.dispatch({
-      changes: { from: 0, to: view.state.doc.length, insert: content },
-    });
-  }, [content, readOnly]);
+    const editor = editorRef.current;
+    if (!editor || !readOnly) return;
+    const model = editor.getModel();
+    if (!model || model.getValue() === content) return;
+    model.setValue(content);
+    if (diff) applyDiffDecorations(editor);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, readOnly, diff]);
 
-  return <div ref={hostRef} className="h-full w-full overflow-hidden" />;
+  return (
+    <Editor
+      path={modelPath}
+      defaultValue={content}
+      language={monacoLanguage(language)}
+      theme={monacoThemeFor(theme)}
+      onMount={handleMount}
+      onChange={(value) => {
+        if (!readOnlyRef.current) onChangeRef.current(value ?? "");
+      }}
+      loading={<div className="h-full w-full" />}
+      options={{
+        fontSize,
+        lineHeight,
+        fontFamily: '"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace',
+        fontLigatures: true,
+        minimap: { enabled: false },
+        wordWrap: "on",
+        scrollBeyondLastLine: false,
+        smoothScrolling: true,
+        cursorBlinking: "solid",
+        cursorSmoothCaretAnimation: "off",
+        renderLineHighlight: "line",
+        padding: { top: 8, bottom: 12 },
+        lineNumbersMinChars: 3,
+        glyphMargin: false,
+        folding: true,
+        bracketPairColorization: { enabled: true },
+        guides: { bracketPairs: true, indentation: true },
+        tabSize: 2,
+        automaticLayout: true,
+        stickyScroll: { enabled: false },
+        scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
+        overviewRulerBorder: false,
+        hideCursorInOverviewRuler: true,
+        contextmenu: true,
+        quickSuggestions: true,
+        readOnly,
+        domReadOnly: readOnly,
+        fixedOverflowWidgets: true,
+      }}
+    />
+  );
 }

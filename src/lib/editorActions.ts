@@ -1,46 +1,43 @@
-import { redo, selectAll, undo } from "@codemirror/commands";
-import { openSearchPanel } from "@codemirror/search";
 import { copyText, readText } from "./clipboard";
 import { getActiveEditor } from "./editorBridge";
 
 /** Editor commands shared by the context menu and the menu bar. */
 
 export function hasEditorSelection(): boolean {
-  const view = getActiveEditor();
-  if (!view) return false;
-  const { from, to } = view.state.selection.main;
-  return from !== to;
+  const editor = getActiveEditor();
+  const selection = editor?.getSelection();
+  return Boolean(selection && !selection.isEmpty());
 }
 
 function selectionText(): string {
-  const view = getActiveEditor();
-  if (!view) return "";
-  const { from, to } = view.state.selection.main;
-  return view.state.sliceDoc(from, to);
+  const editor = getActiveEditor();
+  const model = editor?.getModel();
+  const selection = editor?.getSelection();
+  if (!model || !selection) return "";
+  return model.getValueInRange(selection);
 }
 
 export function editorUndo() {
-  const view = getActiveEditor();
-  if (view) undo(view);
+  getActiveEditor()?.trigger("menu", "undo", null);
 }
 
 export function editorRedo() {
-  const view = getActiveEditor();
-  if (view) redo(view);
+  getActiveEditor()?.trigger("menu", "redo", null);
 }
 
 export function editorSelectAll() {
-  const view = getActiveEditor();
-  if (!view) return;
-  selectAll(view);
-  view.focus();
+  const editor = getActiveEditor();
+  const model = editor?.getModel();
+  if (!editor || !model) return;
+  editor.setSelection(model.getFullModelRange());
+  editor.focus();
 }
 
 export function editorFind() {
-  const view = getActiveEditor();
-  if (!view) return;
-  openSearchPanel(view);
-  view.focus();
+  const editor = getActiveEditor();
+  if (!editor) return;
+  void editor.getAction("actions.find")?.run();
+  editor.focus();
 }
 
 export async function editorCopy(): Promise<boolean> {
@@ -50,22 +47,23 @@ export async function editorCopy(): Promise<boolean> {
 }
 
 export async function editorCut(): Promise<boolean> {
-  const view = getActiveEditor();
-  if (!view) return false;
-  const { from, to } = view.state.selection.main;
-  if (from === to) return false;
-  await copyText(view.state.sliceDoc(from, to));
-  view.dispatch({ changes: { from, to, insert: "" } });
-  view.focus();
+  const editor = getActiveEditor();
+  const model = editor?.getModel();
+  const selection = editor?.getSelection();
+  if (!editor || !model || !selection || selection.isEmpty()) return false;
+  await copyText(model.getValueInRange(selection));
+  editor.executeEdits("cut", [{ range: selection, text: "", forceMoveMarkers: true }]);
+  editor.focus();
   return true;
 }
 
 export async function editorPaste(): Promise<boolean> {
-  const view = getActiveEditor();
-  if (!view) return false;
+  const editor = getActiveEditor();
+  const selection = editor?.getSelection();
+  if (!editor || !selection) return false;
   const text = await readText();
   if (!text) return false;
-  view.dispatch(view.state.replaceSelection(text));
-  view.focus();
+  editor.executeEdits("paste", [{ range: selection, text, forceMoveMarkers: true }]);
+  editor.focus();
   return true;
 }

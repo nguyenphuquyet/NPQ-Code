@@ -43,14 +43,9 @@
   --vs-input: 255 255 255;
   --vs-badge: 225 225 225;
   --vs-highlight: 255 233 168;
-  /*
-   * 60% of #add6ff over the white editor (173 214 255 -> 206 230 255). An
-   * opaque #add6ff drowns the 13px token colours, so a selection reads as one
-   * flat colour; the lighter tint keeps keyword/string/number legible.
-   * Pre-blended rather than alpha on purpose: CodeMirror paints the selection
-   * layer and the native ::selection, and two translucent layers would stack.
-   */
-  --vs-selection: 206 230 255;
+  /* Same fill as QChat IDE / VS Code light (`#add6ff`); `::selection` only
+   * paints the background, so the token colours stay visible inside it. */
+  --vs-selection: 173 214 255;
   --vs-selection-text: 31 31 31;
   --vs-scrollbar: 200 200 200;
   --vs-scrollbar-hover: 168 168 168;
@@ -58,7 +53,7 @@
   --cm-bg: 255 255 255;
   --cm-fg: 31 31 31;
   --cm-caret: 0 0 0;
-  --cm-selection: 206 230 255;
+  --cm-selection: 173 214 255;
   --cm-selection-match: 201 228 251;
   /* Overlay (not a solid fill): the active line sits above the selection layer. */
   --cm-active-line: 0 0 0;
@@ -406,46 +401,33 @@ textarea::selection {
 }
 
 /*
- * Editor text metrics mirror QChat IDE, whose Monaco instance renders at
- * 13px with 18px lines (Monaco computes `round(1.35 * fontSize)` on Windows)
+ * Editor text metrics mirror QChat IDE: Monaco renders 13px text on 18px lines
  * in JetBrains Mono. The font ships with the app, so the editor looks the same
  * on machines without it installed.
  *
- * `--ui-scale` is 1.1 by default here, so both values are anchored at that
- * default: the editor matches QChat exactly as the app opens, and the zoom
+ * `--ui-scale` is 1.1 by default here, so `CodeEditor` anchors both values at
+ * that default: the editor matches QChat exactly as the app opens, and the zoom
  * commands still scale the code with the rest of the shell.
  */
-.cm-editor {
-  height: 100%;
+.monaco-editor {
   font-family: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace,
     SFMono-Regular, Consolas, monospace;
-  font-size: calc(13px * var(--ui-scale, 1.1) / 1.1);
-  line-height: calc(18px * var(--ui-scale, 1.1) / 1.1);
-}
-.cm-editor .cm-scroller {
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
-  overflow: auto;
-}
-.cm-editor .cm-gutters {
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
 }
 
 /* Unified diff tab: tint whole lines, similar to VS Code's diff editor. */
-.cm-line.cm-diff-add {
+.monaco-editor .npq-diff-add {
   background-color: rgb(var(--vs-green) / 0.16);
 }
-.cm-line.cm-diff-del {
+.monaco-editor .npq-diff-del {
   background-color: rgb(var(--vs-red) / 0.16);
 }
-.cm-line.cm-diff-hunk {
+.monaco-editor .npq-diff-hunk {
   background-color: rgb(var(--vs-accent) / 0.1);
+}
+.monaco-editor .npq-diff-hunk-text {
   color: rgb(var(--vs-accent));
 }
-.cm-line.cm-diff-meta {
+.monaco-editor .npq-diff-meta-text {
   color: rgb(var(--vs-dim));
 }
 
