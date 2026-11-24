@@ -25,11 +25,8 @@ import {
   editorCopy,
   editorCut,
   editorFind,
-  editorFormatDocument,
-  editorGoToDefinition,
   editorPaste,
   editorRedo,
-  editorRenameSymbol,
   editorSelectAll,
   editorUndo,
   hasEditorSelection,
@@ -94,27 +91,7 @@ export default function EditorArea() {
 
   const onEditorContextMenu = (event: ReactMouseEvent) => {
     const view = getActiveEditor();
-    const readonly = Boolean(active?.diff);
     ctx.open(event, [
-      {
-        label: t("menu.goToDefinition"),
-        shortcut: "F12",
-        disabled: !view,
-        action: editorGoToDefinition,
-      },
-      {
-        label: t("menu.renameSymbol"),
-        shortcut: "F2",
-        disabled: !view || readonly,
-        action: editorRenameSymbol,
-      },
-      {
-        label: t("menu.formatDocument"),
-        shortcut: "Shift+Alt+F",
-        disabled: !view || readonly,
-        action: editorFormatDocument,
-      },
-      { separator: true },
       { label: t("menu.undo"), shortcut: "Ctrl+Z", disabled: !view, action: editorUndo },
       { label: t("menu.redo"), shortcut: "Ctrl+Y", disabled: !view, action: editorRedo },
       { separator: true },

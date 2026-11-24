@@ -67,22 +67,3 @@ export async function editorPaste(): Promise<boolean> {
   editor.focus();
   return true;
 }
-
-export function editorFormatDocument() {
-  const editor = getActiveEditor();
-  if (!editor) return;
-  void editor.getAction("editor.action.formatDocument")?.run();
-  editor.focus();
-}
-
-export function editorRenameSymbol() {
-  const editor = getActiveEditor();
-  if (!editor) return;
-  void editor.getAction("editor.action.rename")?.run();
-}
-
-export function editorGoToDefinition() {
-  const editor = getActiveEditor();
-  if (!editor) return;
-  void editor.getAction("editor.action.revealDefinition")?.run();
-}
