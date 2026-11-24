@@ -157,7 +157,7 @@ export default function CodeEditor({
         wordWrap: "on",
         scrollBeyondLastLine: false,
         smoothScrolling: true,
-        cursorBlinking: "solid",
+        cursorBlinking: "blink",
         cursorSmoothCaretAnimation: "off",
         renderLineHighlight: "line",
         padding: { top: 8, bottom: 12 },
