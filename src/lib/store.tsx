@@ -12,9 +12,11 @@ import {
   fileName,
   onTerminalDone,
   onTerminalOutput,
+  previewKind,
   type EditorLanguage,
   type FileNode,
   type GitStatus,
+  type PreviewKind,
   type RecentWorkspace,
   type SearchFile,
   type WorkspaceInfo,
@@ -27,12 +29,16 @@ export type OpenFile = {
   language: EditorLanguage;
   content: string;
   dirty: boolean;
-  /** Read-only documents (git diffs) never write back to disk. */
+  /** Read-only documents (git diffs, text previews) never write back to disk. */
   readOnly?: boolean;
   /** Render as a unified diff with add/remove line colours. */
   diff?: boolean;
   /** Real file the document was derived from, for breadcrumbs. */
   sourcePath?: string;
+  /** Binary/media file rendered by the preview pane instead of the editor. */
+  preview?: PreviewKind;
+  /** Last known size in bytes, for the preview footer. */
+  size?: number;
 };
 
 export type GitState = {
@@ -186,6 +192,7 @@ type StudioState = {
   refreshTree: () => void;
   openFile: (path: string) => Promise<void>;
   openFileAt: (path: string, line?: number, column?: number) => Promise<void>;
+  openTextPreview: (path: string) => Promise<void>;
   closeTab: (path: string) => void;
   closeOtherTabs: (path: string) => void;
   closeAllTabs: () => void;
@@ -569,6 +576,18 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
             });
             continue;
           }
+          const kind = previewKind(stored.path);
+          if (kind) {
+            restored.push({
+              path: stored.path,
+              name: fileName(stored.path),
+              language: fileLanguage(stored.path),
+              content: "",
+              dirty: false,
+              preview: kind,
+            });
+            continue;
+          }
           try {
             const content = await api.readFile(stored.path);
             if (cancelled) return;
@@ -692,6 +711,25 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     async (path: string) => {
       setActivePath(path);
       if (openFiles.some((file) => file.path === path)) return;
+      const kind = previewKind(path);
+      if (kind) {
+        setOpenFiles((prev) =>
+          prev.some((file) => file.path === path)
+            ? prev
+            : [
+                ...prev,
+                {
+                  path,
+                  name: fileName(path),
+                  language: fileLanguage(path),
+                  content: "",
+                  dirty: false,
+                  preview: kind,
+                },
+              ],
+        );
+        return;
+      }
       try {
         const content = await api.readFile(path);
         setOpenFiles((prev) => {
@@ -702,8 +740,60 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
           ];
         });
       } catch (error) {
-        showToast(String(error));
+        const message = String(error);
+        // Binary or oversized files still open, in the preview pane, so the
+        // explorer never dead-ends on a file the text editor cannot render.
+        if (message.includes("BINARY_FILE") || message.includes("FILE_TOO_LARGE")) {
+          setOpenFiles((prev) =>
+            prev.some((file) => file.path === path)
+              ? prev
+              : [
+                  ...prev,
+                  {
+                    path,
+                    name: fileName(path),
+                    language: fileLanguage(path),
+                    content: "",
+                    dirty: false,
+                    preview: "binary",
+                  },
+                ],
+          );
+          return;
+        }
+        showToast(message);
         setActivePath((current) => (current === path ? null : current));
+      }
+    },
+    [openFiles, showToast],
+  );
+
+  /** Read-only tab with the first chunk of any file, for binaries/large logs. */
+  const openTextPreview = useCallback(
+    async (path: string) => {
+      const virtualPath = `text-preview:${path}`;
+      setActivePath(virtualPath);
+      if (openFiles.some((file) => file.path === virtualPath)) return;
+      try {
+        const content = await api.readFileHead(path, 512 * 1024);
+        setOpenFiles((prev) => {
+          if (prev.some((file) => file.path === virtualPath)) return prev;
+          return [
+            ...prev,
+            {
+              path: virtualPath,
+              name: fileName(path),
+              language: fileLanguage(path),
+              content,
+              dirty: false,
+              readOnly: true,
+              sourcePath: path,
+            },
+          ];
+        });
+      } catch (error) {
+        showToast(String(error));
+        setActivePath((current) => (current === virtualPath ? null : current));
       }
     },
     [openFiles, showToast],
@@ -804,7 +894,9 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const updateContent = useCallback((path: string, content: string) => {
     setOpenFiles((prev) =>
       prev.map((file) =>
-        file.path === path && !file.readOnly ? { ...file, content, dirty: true } : file,
+        file.path === path && !file.readOnly && !file.preview
+          ? { ...file, content, dirty: true }
+          : file,
       ),
     );
   }, []);
@@ -1085,6 +1177,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     refreshTree,
     openFile,
     openFileAt,
+    openTextPreview,
     closeTab,
     closeOtherTabs,
     closeAllTabs,

@@ -9,6 +9,7 @@ Backend: **Tauri v2** (Rust).
 - **Open Folder**: mở bất kỳ thư mục nào làm workspace (không cần manifest, không ràng buộc framework).
 - **Explorer**: cây tệp có tạo tệp/thư mục, đổi tên, xoá, copy đường dẫn, làm mới, thu gọn.
 - **Editor**: tab, breadcrumb, dirty marker, lưu bằng `Ctrl+S`, **tô sáng cú pháp cho 30+ ngôn ngữ** (TS/TSX/JS/JSX, JSON, HTML/XML, CSS/SCSS/Less, Python, Rust, Go, C/C++, C#, Java, Kotlin, Scala, Dart, PHP, Ruby, Lua, SQL, YAML, Markdown, Shell, TOML, PowerShell, Dockerfile, INI/ENV, Diff…), autocomplete, bracket matching, tìm kiếm trong tệp.
+- **Xem trước tệp nhị phân & media**: ảnh (PNG/JPG/GIF/WebP/BMP/ICO/AVIF/TIFF) có zoom và kích thước gốc, video (MP4/WebM/MOV/MKV…), âm thanh (MP3/WAV/OGG/FLAC…), PDF; tệp nén/tài liệu/executable hiện thẻ thông tin với nút **Mở bằng ứng dụng mặc định**, **Hiện trong File Explorer** và **Xem dạng văn bản**. Tệp văn bản sai encoding vẫn mở được (ký tự lỗi thay bằng �).
 - **Tìm kiếm toàn workspace**: panel Search (`Ctrl+Shift+F`), kết quả theo tệp, bấm để nhảy đúng dòng/cột.
 - **Quick Open**: `Ctrl+P` để mở nhanh tệp theo tên.
 - **Terminal tích hợp**: chạy lệnh shell ngay trong workspace, log stream theo thời gian thực, dừng lệnh đang chạy.

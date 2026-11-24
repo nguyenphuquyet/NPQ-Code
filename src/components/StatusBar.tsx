@@ -9,7 +9,8 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { useStudio } from "../lib/store";
-import { useI18n } from "../lib/i18n";
+import { useI18n, type TranslationKey } from "../lib/i18n";
+import type { PreviewKind } from "../lib/api";
 
 const LANGUAGE_LABEL: Record<string, string> = {
   tsx: "TypeScript React",
@@ -46,12 +47,22 @@ const LANGUAGE_LABEL: Record<string, string> = {
   diff: "Diff",
 };
 
+const PREVIEW_LABEL: Record<PreviewKind, TranslationKey> = {
+  image: "preview.image",
+  video: "preview.video",
+  audio: "preview.audio",
+  pdf: "preview.pdf",
+  binary: "preview.binary",
+};
+
 export default function StatusBar() {
   const s = useStudio();
   const { t } = useI18n();
   const active = s.openFiles.find((file) => file.path === s.activePath);
   const language = active
-    ? (LANGUAGE_LABEL[active.language] ?? t("status.plainText"))
+    ? active.preview
+      ? t(PREVIEW_LABEL[active.preview])
+      : (LANGUAGE_LABEL[active.language] ?? t("status.plainText"))
     : "";
 
   return (
@@ -114,15 +125,21 @@ export default function StatusBar() {
 
       {active && (
         <>
-          <span className="px-2">
-            {t("status.lineCol", { line: s.cursor.line, col: s.cursor.col })}
-          </span>
+          {!active.preview && (
+            <span className="px-2">
+              {t("status.lineCol", { line: s.cursor.line, col: s.cursor.col })}
+            </span>
+          )}
           <span className="px-2">{language}</span>
         </>
       )}
 
-      <span className="px-2">UTF-8</span>
-      <span className="px-2">LF</span>
+      {!active?.preview && (
+        <>
+          <span className="px-2">UTF-8</span>
+          <span className="px-2">LF</span>
+        </>
+      )}
 
       <button
         className="flex h-full items-center gap-1 px-2 hover:bg-white/15"

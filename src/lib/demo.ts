@@ -1,4 +1,5 @@
 import type {
+  FileMeta,
   FileNode,
   GitBranchList,
   GitFile,
@@ -135,6 +136,55 @@ addFile("Dockerfile", [
   "COPY --from=build /app/dist /usr/share/nginx/html",
   "EXPOSE 80",
 ]);
+
+/*
+ * Media preview demo: the browser build cannot read the disk, so `img` sources
+ * come from `demoAssetUrl` and these placeholders only exist to show the pane.
+ */
+addFile("assets/logo.png", []);
+addFile("assets/demo.mp4", []);
+addFile("assets/archive.zip", []);
+addFile("docs/handbook.pdf", []);
+
+const demoMediaSizes = new Map<string, number>([
+  [`${demoWorkspace.path}/assets/logo.png`, 96_432],
+  [`${demoWorkspace.path}/assets/demo.mp4`, 3_684_352],
+  [`${demoWorkspace.path}/assets/archive.zip`, 1_204_880],
+  [`${demoWorkspace.path}/docs/handbook.pdf`, 512_880],
+]);
+
+const demoAssetCache = new Map<string, string>();
+
+function escapeXml(value: string) {
+  return value.replace(/[<>&"']/g, (char) =>
+    char === "<" ? "&lt;" : char === ">" ? "&gt;" : char === "&" ? "&amp;" : char === '"' ? "&quot;" : "&apos;",
+  );
+}
+
+/** SVG stand-in for image files in the browser demo. */
+export function demoAssetUrl(path: string): string {
+  const cached = demoAssetCache.get(path);
+  if (cached) return cached;
+  const name = escapeXml(path.split("/").pop() ?? "image");
+  const svg = [
+    '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640">',
+    '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">',
+    '<stop offset="0" stop-color="#0b3d63"/><stop offset="1" stop-color="#1f6feb"/></linearGradient></defs>',
+    '<rect width="960" height="640" fill="url(#g)"/>',
+    '<circle cx="760" cy="140" r="120" fill="#ffffff" opacity="0.08"/>',
+    '<circle cx="180" cy="520" r="180" fill="#ffffff" opacity="0.06"/>',
+    '<text x="80" y="300" font-family="Segoe UI, sans-serif" font-size="56" font-weight="700" fill="#ffffff">',
+    "NPQ Code",
+    "</text>",
+    `<text x="80" y="360" font-family="Segoe UI, sans-serif" font-size="28" fill="#c9e2ff">${name}</text>`,
+    '<text x="80" y="410" font-family="Segoe UI, sans-serif" font-size="20" fill="#9dc4ea">',
+    "Demo image · desktop build shows the real file",
+    "</text></svg>",
+  ].join("");
+  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  demoAssetCache.set(path, url);
+  return url;
+}
 
 addFile("package.json", [
   "{",
@@ -292,6 +342,22 @@ export const demoApi = {
     const content = files.get(path);
     if (content === undefined) throw new Error(`Demo backend: no such file ${path}`);
     return content;
+  },
+  readFileHead: async (path: string, limit?: number): Promise<string> => {
+    const content = files.get(path);
+    if (content === undefined) throw new Error(`Demo backend: no such file ${path}`);
+    return content.slice(0, limit ?? 512 * 1024);
+  },
+  fileMeta: async (path: string): Promise<FileMeta> => ({
+    size: demoMediaSizes.get(path) ?? files.get(path)?.length ?? 0,
+    modified: Date.now(),
+    is_dir: false,
+  }),
+  openExternal: async (): Promise<void> => {
+    /* the browser demo has no shell to hand the file to */
+  },
+  revealPath: async (): Promise<void> => {
+    /* the browser demo has no file manager */
   },
   writeFile: async (path: string, content: string): Promise<void> => {
     files.set(path, content);

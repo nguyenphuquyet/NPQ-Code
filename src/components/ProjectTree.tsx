@@ -3,9 +3,13 @@ import {
   Braces,
   ChevronRight,
   ClipboardCopy,
+  ExternalLink,
+  FileArchive,
+  FileAudio,
   FileCode2,
   FilePlus2,
   FileText,
+  FileVideo,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -19,8 +23,8 @@ import {
 } from "lucide-react";
 import { useStudio } from "../lib/store";
 import { useI18n } from "../lib/i18n";
-import type { FileNode } from "../lib/api";
-import { useContextMenu } from "./ContextMenu";
+import { api, isTauri, previewKind, type FileNode } from "../lib/api";
+import { useContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { copyText } from "../lib/clipboard";
 
 function fileIcon(name: string) {
@@ -44,9 +48,12 @@ function fileIcon(name: string) {
   if (/\.(ya?ml|toml|ini|cfg|conf|env|properties|ps1|psm1|psd1)$/.test(lower)) {
     return <FileCode2 size={14} className="text-vs-purple" />;
   }
-  if (/\.(png|jpe?g|gif|webp|ico|bmp)$/.test(lower)) {
-    return <ImageIcon size={14} className="text-vs-purple" />;
-  }
+  const kind = previewKind(lower);
+  if (kind === "image") return <ImageIcon size={14} className="text-vs-purple" />;
+  if (kind === "video") return <FileVideo size={14} className="text-vs-orange" />;
+  if (kind === "audio") return <FileAudio size={14} className="text-vs-green" />;
+  if (kind === "pdf") return <FileText size={14} className="text-vs-red" />;
+  if (kind === "binary") return <FileArchive size={14} className="text-vs-purple" />;
   return <FileText size={14} className="text-vs-dim" />;
 }
 
@@ -101,7 +108,7 @@ function TreeNode({ node, depth, expanded, toggle }: TreeProps) {
   const openFile = s.openFiles.find((file) => file.path === node.path);
 
   const onContextMenu = (event: ReactMouseEvent) => {
-    const items = node.is_dir
+    const items: ContextMenuItem[] = node.is_dir
       ? [
           {
             label: t("explorer.newFile"),
@@ -119,12 +126,28 @@ function TreeNode({ node, depth, expanded, toggle }: TreeProps) {
               if (name) void s.newFolder(node.path, name);
             },
           },
-          { separator: true as const },
+          { separator: true },
         ]
       : [
           { label: t("tree.open"), icon: <FileCode2 size={12} />, action: () => void s.openFile(node.path) },
-          { separator: true as const },
         ];
+
+    if (!node.is_dir && isTauri) {
+      items.push(
+        {
+          label: t("preview.openExternal"),
+          icon: <ExternalLink size={12} />,
+          action: () => void api.openExternal(node.path).catch((error) => s.showToast(String(error))),
+        },
+        {
+          label: t("preview.reveal"),
+          icon: <FolderOpen size={12} />,
+          action: () => void api.revealPath(node.path).catch((error) => s.showToast(String(error))),
+        },
+      );
+    }
+
+    if (!node.is_dir) items.push({ separator: true });
 
     ctx.open(event, [
       ...items,

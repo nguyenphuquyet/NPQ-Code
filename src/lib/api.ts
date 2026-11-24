@@ -1,7 +1,7 @@
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { demoApi, demoOnTerminalDone, demoOnTerminalOutput } from "./demo";
+import { demoApi, demoAssetUrl, demoOnTerminalDone, demoOnTerminalOutput } from "./demo";
 
 /**
  * `npm run dev` also serves the UI in a plain browser, where the Tauri IPC
@@ -85,6 +85,15 @@ export type GitBranchList = {
   branches: string[];
 };
 
+export type FileMeta = {
+  size: number;
+  modified: number | null;
+  is_dir: boolean;
+};
+
+/** Files the editor renders as a preview instead of a text buffer. */
+export type PreviewKind = "image" | "video" | "audio" | "pdf" | "binary";
+
 export type EditorLanguage =
   | "tsx"
   | "ts"
@@ -126,6 +135,11 @@ const tauriApi = {
   removeRecent: (path: string) => invoke<void>("remove_recent", { path }),
   listTree: (path: string) => invoke<FileNode>("list_tree", { path }),
   readFile: (path: string) => invoke<string>("read_file", { path }),
+  readFileHead: (path: string, limit?: number) =>
+    invoke<string>("read_file_head", { path, limit }),
+  fileMeta: (path: string) => invoke<FileMeta>("file_meta", { path }),
+  openExternal: (path: string) => invoke<void>("open_external", { path }),
+  revealPath: (path: string) => invoke<void>("reveal_path", { path }),
   writeFile: (path: string, content: string) => invoke<void>("write_file", { path, content }),
   createFile: (path: string) => invoke<void>("create_file", { path }),
   createDirectory: (path: string) => invoke<void>("create_directory", { path }),
@@ -246,6 +260,135 @@ export function fileLanguage(path: string): EditorLanguage {
   if (name === ".env" || name.startsWith(".env.")) return "ini";
   const extension = name.split(".").pop() ?? "";
   return LANGUAGE_BY_EXTENSION[extension] ?? "text";
+}
+
+const IMAGE_EXTENSIONS = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "jfif",
+  "gif",
+  "webp",
+  "bmp",
+  "ico",
+  "avif",
+  "apng",
+  "tif",
+  "tiff",
+]);
+const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "ogv", "mov", "m4v", "mkv", "avi", "wmv", "flv"]);
+const AUDIO_EXTENSIONS = new Set([
+  "mp3",
+  "wav",
+  "ogg",
+  "oga",
+  "m4a",
+  "aac",
+  "flac",
+  "opus",
+  "weba",
+  "wma",
+  "mid",
+  "midi",
+]);
+const BINARY_EXTENSIONS = new Set([
+  "zip",
+  "rar",
+  "7z",
+  "tar",
+  "gz",
+  "bz2",
+  "xz",
+  "zst",
+  "tgz",
+  "exe",
+  "msi",
+  "dll",
+  "so",
+  "dylib",
+  "bin",
+  "dat",
+  "class",
+  "jar",
+  "war",
+  "wasm",
+  "pyc",
+  "pyd",
+  "o",
+  "obj",
+  "lib",
+  "a",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "ppt",
+  "pptx",
+  "odt",
+  "ods",
+  "odp",
+  "rtf",
+  "psd",
+  "ai",
+  "eps",
+  "sketch",
+  "fig",
+  "ttf",
+  "otf",
+  "woff",
+  "woff2",
+  "eot",
+  "db",
+  "sqlite",
+  "sqlite3",
+  "mdb",
+  "iso",
+  "dmg",
+  "pkg",
+  "deb",
+  "rpm",
+  "apk",
+  "aab",
+  "ipa",
+  "blend",
+  "fbx",
+  "stl",
+  "unitypackage",
+]);
+
+/**
+ * Binary and media files get a dedicated preview pane; everything else
+ * (`null`) opens as an editable text buffer.
+ */
+export function previewKind(path: string): PreviewKind | null {
+  const name = fileName(path).toLowerCase();
+  const dot = name.lastIndexOf(".");
+  const extension = dot > 0 ? name.slice(dot + 1) : "";
+  if (IMAGE_EXTENSIONS.has(extension)) return "image";
+  if (VIDEO_EXTENSIONS.has(extension)) return "video";
+  if (AUDIO_EXTENSIONS.has(extension)) return "audio";
+  if (extension === "pdf") return "pdf";
+  if (BINARY_EXTENSIONS.has(extension)) return "binary";
+  return null;
+}
+
+/** Local files become `asset://` URLs inside the Tauri webview. */
+export function assetUrl(path: string): string {
+  if (!isTauri) return demoAssetUrl(path);
+  return convertFileSrc(path);
+}
+
+export function formatBytes(size: number): string {
+  if (!Number.isFinite(size) || size < 0) return "";
+  if (size < 1024) return `${size} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = size / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unit]}`;
 }
 
 export function fileName(path: string): string {

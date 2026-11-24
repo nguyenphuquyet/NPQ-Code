@@ -1,10 +1,23 @@
-import { ChevronRight, FileCode2, FileDiff, X } from "lucide-react";
+import {
+  ChevronRight,
+  FileArchive,
+  FileAudio,
+  FileCode2,
+  FileDiff,
+  FileText,
+  FileVideo,
+  Image as ImageIcon,
+  Info,
+  X,
+} from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useStudio } from "../lib/store";
 import { useI18n } from "../lib/i18n";
 import { fileLanguage, fileName, relativePath } from "../lib/api";
+import type { PreviewKind } from "../lib/api";
 import type { OpenFile } from "../lib/store";
 import CodeEditor from "./CodeEditor";
+import MediaPreview from "./MediaPreview";
 import { useContextMenu } from "./ContextMenu";
 import { copyText } from "../lib/clipboard";
 import { getActiveEditor } from "../lib/editorBridge";
@@ -19,9 +32,21 @@ import {
   hasEditorSelection,
 } from "../lib/editorActions";
 
+const PREVIEW_ICON: Record<PreviewKind, { icon: typeof ImageIcon; className: string }> = {
+  image: { icon: ImageIcon, className: "text-vs-purple" },
+  video: { icon: FileVideo, className: "text-vs-orange" },
+  audio: { icon: FileAudio, className: "text-vs-green" },
+  pdf: { icon: FileText, className: "text-vs-red" },
+  binary: { icon: FileArchive, className: "text-vs-dim" },
+};
+
 function tabIcon(file: OpenFile) {
   if (file.diff) return <FileDiff size={13} className="text-vs-green" />;
-  const name = file.name.toLowerCase();
+  if (file.preview) {
+    const { icon: Icon, className } = PREVIEW_ICON[file.preview];
+    return <Icon size={13} className={className} />;
+  }
+  const name = (file.sourcePath ? fileName(file.sourcePath) : file.name).toLowerCase();
   if (name === "dockerfile" || name.startsWith("dockerfile.")) {
     return <FileCode2 size={13} className="text-vs-blue" />;
   }
@@ -56,7 +81,12 @@ export default function EditorArea() {
   const crumbs = active
     ? active.diff
       ? [fileName(active.sourcePath ?? active.path), t("git.diffSuffix")]
-      : relativePath(s.workspace?.path ?? "", active.path).replace(/\\/g, "/").split("/")
+      : active.sourcePath
+        ? [
+            ...relativePath(s.workspace?.path ?? "", active.sourcePath).replace(/\\/g, "/").split("/"),
+            t("preview.textSuffix"),
+          ]
+        : relativePath(s.workspace?.path ?? "", active.path).replace(/\\/g, "/").split("/")
     : [];
 
   const onEditorContextMenu = (event: ReactMouseEvent) => {
@@ -164,17 +194,33 @@ export default function EditorArea() {
       {/* Editor */}
       <div className="relative min-h-0 flex-1" onContextMenu={onEditorContextMenu}>
         {active ? (
-          <CodeEditor
-            key={active.path}
-            content={active.content}
-            language={active.diff ? "text" : fileLanguage(active.path)}
-            readOnly={active.readOnly}
-            diff={active.diff}
-            reveal={s.reveal && s.reveal.path === active.path ? s.reveal : null}
-            onChange={(value) => s.updateContent(active.path, value)}
-            onCursor={(line, col) => s.setCursor(line, col)}
-            onSave={() => void s.saveFile(active.path)}
-          />
+          active.preview ? (
+            <MediaPreview key={active.path} file={active} />
+          ) : (
+            <div className="flex h-full min-h-0 flex-col">
+              {active.readOnly && active.sourcePath && (
+                <div className="flex shrink-0 items-center gap-1.5 border-b border-vs-border bg-vs-panel px-3 py-1 text-2xs text-vs-dim">
+                  <Info size={12} className="shrink-0 text-vs-accent" />
+                  <span className="truncate">{t("preview.textPreviewBanner")}</span>
+                </div>
+              )}
+              <div className="min-h-0 flex-1">
+                <CodeEditor
+                  key={active.path}
+                  content={active.content}
+                  language={
+                    active.diff ? "text" : fileLanguage(active.sourcePath ?? active.path)
+                  }
+                  readOnly={active.readOnly}
+                  diff={active.diff}
+                  reveal={s.reveal && s.reveal.path === active.path ? s.reveal : null}
+                  onChange={(value) => s.updateContent(active.path, value)}
+                  onCursor={(line, col) => s.setCursor(line, col)}
+                  onSave={() => void s.saveFile(active.path)}
+                />
+              </div>
+            </div>
+          )
         ) : (
           <div className="absolute inset-0 grid place-items-center text-center">
             <div className="max-w-sm text-vs-dim">
